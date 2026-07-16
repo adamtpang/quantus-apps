@@ -21,6 +21,11 @@ Uint8List getAccountId32(String ss58Address) {
   return Address.decode(ss58Address).addressBytes;
 }
 
+/// Block coordinates for a mortal extrinsic: [blockHash] is the hash of block
+/// [blockNumber] (hex, no 0x prefix), which the era in the signed payload uses
+/// as its birth block.
+typedef MortalityCheckpoint = ({int blockNumber, String blockHash});
+
 class SubstrateService {
   static final SubstrateService _instance = SubstrateService._internal();
   factory SubstrateService() => _instance;
@@ -210,17 +215,19 @@ class SubstrateService {
   }
 
   Future<ExtrinsicData> getExtrinsicPayload(Account account, RuntimeCall call, {bool isSigned = true}) async {
-    final [runtimeVersion, genesisHash, blockNumber, blockHash, nonce] = await Future.wait([
+    final [runtimeVersion, genesisHash, checkpointResult, nonce] = await Future.wait([
       _rpcEndpointService.rpcTask((uri) async {
         final provider = Provider.fromUri(uri);
         final stateApi = StateApi(provider);
         return await stateApi.getRuntimeVersion();
       }),
       _getGenesisHash(),
-      _getBlockNumber(),
-      _getBlockHash(),
+      _getMortalityCheckpoint(),
       _getNextAccountNonceFromAddress(account.accountId),
     ]);
+    final checkpoint = checkpointResult as MortalityCheckpoint;
+    final blockNumber = checkpoint.blockNumber;
+    final blockHash = checkpoint.blockHash;
 
     final [specVersion, transactionVersion] = [runtimeVersion.specVersion, runtimeVersion.transactionVersion];
     final encodedCall = call.encode();
@@ -288,17 +295,19 @@ class SubstrateService {
   Future<UnsignedTransactionData> getUnsignedTransactionPayload(Account account, RuntimeCall call) async {
     final accountIdBytes = crypto.ss58ToAccountId(s: account.accountId);
 
-    final [runtimeVersion, genesisHash, blockNumber, blockHash, nonce] = await Future.wait([
+    final [runtimeVersion, genesisHash, checkpointResult, nonce] = await Future.wait([
       _rpcEndpointService.rpcTask((uri) async {
         final provider = Provider.fromUri(uri);
         final stateApi = StateApi(provider);
         return await stateApi.getRuntimeVersion();
       }),
       _getGenesisHash(),
-      _getBlockNumber(),
-      _getBlockHash(),
+      _getMortalityCheckpoint(),
       _getNextAccountNonceFromAddress(account.accountId),
     ]);
+    final checkpoint = checkpointResult as MortalityCheckpoint;
+    final blockNumber = checkpoint.blockNumber;
+    final blockHash = checkpoint.blockHash;
 
     final [specVersion, transactionVersion] = [runtimeVersion.specVersion, runtimeVersion.transactionVersion];
     final encodedCall = call.encode();
@@ -353,12 +362,38 @@ class SubstrateService {
     return int.parse(nonceResult.result.toString());
   }
 
-  Future<dynamic> _getBlockHash() async {
-    final result = await _rpcEndpointService.rpcTask((uri) async {
+  /// The era signed into a mortal extrinsic uses the payload's block number as
+  /// its birth block, and the node verifies the signature against the hash of
+  /// that exact block. Fetching the best-block hash in a separate call can
+  /// return a different block's hash — a block can land between the two calls,
+  /// or endpoint failover can serve them from nodes at different heights — and
+  /// the node then rejects the extrinsic as invalid. Fetch the header and the
+  /// hash *at that number* sequentially on a single endpoint so the pair can
+  /// never disagree.
+  Future<MortalityCheckpoint> _getMortalityCheckpoint() {
+    return _rpcEndpointService.rpcTask((uri) async {
       final provider = Provider.fromUri(uri);
-      return await provider.send('chain_getBlockHash', []);
+      return fetchMortalityCheckpoint((method, params) async {
+        final response = await provider.send(method, params);
+        if (response.error != null) {
+          throw Exception('RPC Error: ${response.error}');
+        }
+        return response.result;
+      });
     });
-    return result.result.replaceAll('0x', '');
+  }
+
+  @visibleForTesting
+  static Future<MortalityCheckpoint> fetchMortalityCheckpoint(
+    Future<dynamic> Function(String method, List<dynamic> params) rpc,
+  ) async {
+    final header = await rpc('chain_getHeader', []);
+    final blockNumber = int.parse(header['number'] as String);
+    final blockHash = await rpc('chain_getBlockHash', [blockNumber]);
+    if (blockHash == null) {
+      throw Exception('chain_getBlockHash($blockNumber) returned null');
+    }
+    return (blockNumber: blockNumber, blockHash: (blockHash as String).replaceAll('0x', ''));
   }
 
   Future<dynamic> _getGenesisHash() async {
