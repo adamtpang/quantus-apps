@@ -16,6 +16,9 @@ void main() {
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
     await RustLib.init();
+    // ss58ToAccountId only accepts Quantus (prefix 189) addresses, so
+    // toAccountId must encode with that prefix too.
+    crypto.setDefaultSs58Prefix(prefix: 189);
   });
 
   group('Recovery proxy account encoding', () {
@@ -53,7 +56,11 @@ void main() {
 
       // WRONG: If we use toAccountId with the AccountId32 as publicKey, it will hash again
       final doubleHashedAddress = crypto.toAccountId(
-        obj: crypto.Keypair(publicKey: Uint8List.fromList(correctAccountIdBytes), secretKey: Uint8List(0)),
+        obj: crypto.Keypair(
+          publicKey: Uint8List.fromList(correctAccountIdBytes),
+          secretKey: Uint8List(0),
+          scheme: crypto.DilithiumScheme.mlDsa87,
+        ),
       );
 
       // Decode to get the bytes - they should NOT match the original AccountId32
@@ -82,7 +89,11 @@ void main() {
 
       // WRONG: What the bug was doing - passing to toAccountId which hashes again
       final wrongAddress = crypto.toAccountId(
-        obj: crypto.Keypair(publicKey: Uint8List.fromList(storageReturnedAccountId), secretKey: Uint8List(0)),
+        obj: crypto.Keypair(
+          publicKey: Uint8List.fromList(storageReturnedAccountId),
+          secretKey: Uint8List(0),
+          scheme: crypto.DilithiumScheme.mlDsa87,
+        ),
       );
       final wrongAddressBytes = crypto.ss58ToAccountId(s: wrongAddress);
 

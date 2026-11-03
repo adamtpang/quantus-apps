@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
 import 'package:resonance_network_wallet/providers/currency_display_provider.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/notification_config_provider.dart';
-import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/currency_picker_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/language_picker_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/settings_divider.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/settings_tappable_row.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class PreferencesSettingsScreenV2 extends ConsumerStatefulWidget {
   const PreferencesSettingsScreenV2({super.key});
@@ -37,10 +34,9 @@ class _PreferencesSettingsScreenV2State extends ConsumerState<PreferencesSetting
   @override
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final notifConfig = ref.watch(notificationConfigProvider);
-    final posMode = ref.watch(posModeProvider);
     final appLocale = ref.watch(selectedAppLocaleProvider);
     final fiat = ref.watch(selectedFiatCurrencyProvider);
 
@@ -55,9 +51,9 @@ class _PreferencesSettingsScreenV2State extends ConsumerState<PreferencesSetting
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(appLocale.displayName, style: text.smallParagraph?.copyWith(color: colors.textMuted)),
+                Text(appLocale.displayName, style: text.caption.copyWith(color: colors.textMuted)),
                 const SizedBox(width: 4),
-                SettingsTappableRowUtils.chevron(colors, color: colors.textMuted, size: 18),
+                SettingsTappableRowUtils.chevron(),
               ],
             ),
           ),
@@ -69,18 +65,11 @@ class _PreferencesSettingsScreenV2State extends ConsumerState<PreferencesSetting
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(fiat.code, style: text.smallParagraph?.copyWith(color: colors.textMuted)),
+                Text(fiat.code, style: text.caption.copyWith(color: colors.textMuted)),
                 const SizedBox(width: 4),
-                SettingsTappableRowUtils.chevron(colors, color: colors.textMuted, size: 18),
+                SettingsTappableRowUtils.chevron(),
               ],
             ),
-          ),
-          const SettingsDivider(),
-          SettingsSwitchRow(
-            title: l10n.settingsPreferencesPosMode,
-            subtitle: l10n.settingsPreferencesPosModeSubtitle,
-            value: posMode,
-            onChanged: (v) => ref.read(posModeProvider.notifier).setPosMode(v),
           ),
           const SettingsDivider(),
           SettingsSwitchRow(

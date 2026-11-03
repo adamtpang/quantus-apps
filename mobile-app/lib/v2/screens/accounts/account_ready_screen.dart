@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/shared/constants/e2e_keys.dart';
-import 'package:resonance_network_wallet/v2/components/loader.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base_bottom_content.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
+import 'package:resonance_network_wallet/v2/components/account_badge.dart';
+import 'package:resonance_network_wallet/v2/components/private_activity_notice.dart';
 import 'package:resonance_network_wallet/v2/screens/home/home_screen.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 enum AccountReadyOverviewOrigin { accountCreated, walletCreated, walletImported }
 
@@ -40,19 +36,16 @@ class AccountReadyScreen extends ConsumerWidget {
   bool get isWalletRelated =>
       origin == AccountReadyOverviewOrigin.walletCreated || origin == AccountReadyOverviewOrigin.walletImported;
 
+  bool get _showTwoAccountCards => origin == AccountReadyOverviewOrigin.walletCreated;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
-    final formattedAddress = AddressFormattingService.formatAddress(
-      accountId,
-      prefix: 8,
-      ellipses: '.......',
-      postFix: 10,
-    );
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final appBarTitle = _appBarTitle(l10n);
     final headline = isWalletRelated ? appBarTitle : accountName;
+    final ctaLabel = _showTwoAccountCards ? l10n.accountReadyGoToWallet : l10n.accountReadyDone;
 
     return PopScope(
       canPop: false,
@@ -80,54 +73,69 @@ class AccountReadyScreen extends ConsumerWidget {
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: colors.success, width: _borderWidth),
+                              border: Border.all(color: colors.semanticSage, width: _borderWidth),
                             ),
-                            child: Icon(Icons.check_rounded, size: _checkIconSize, color: colors.success),
+                            child: Icon(Icons.check_rounded, size: _checkIconSize, color: colors.semanticSage),
                           ),
                           const SizedBox(height: 16),
                           Text(
                             headline,
                             textAlign: TextAlign.center,
-                            style: text.paragraph?.copyWith(fontSize: 32, color: colors.textLightGray, height: 1.0),
+                            style: text.titleSuccess.copyWith(color: colors.textContent),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      if (isWalletRelated) ...[
-                        Text(
-                          accountName,
-                          textAlign: TextAlign.center,
-                          style: text.transactionDetailRowLabel?.copyWith(color: colors.textTertiary),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Column(
-                          children: [
-                            ref
-                                .watch(checksumNameProvider(accountId))
-                                .when(
-                                  data: (checksum) => Text(
-                                    checksum,
-                                    textAlign: TextAlign.center,
-                                    style: text.smallParagraph?.copyWith(
-                                      color: colors.checksum,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                  loading: () => const Loader(size: 14),
-                                  error: (_, _) => const SizedBox.shrink(),
-                                ),
+                          if (_showTwoAccountCards) ...[
                             const SizedBox(height: 4),
                             Text(
-                              formattedAddress.toLowerCase(),
+                              l10n.accountReadyTwoAccountsCreated,
                               textAlign: TextAlign.center,
-                              style: text.transactionDetailRowValue?.copyWith(fontSize: 14),
+                              style: text.body.copyWith(color: colors.textMuted),
                             ),
                           ],
-                        ),
+                        ],
                       ),
+                      if (_showTwoAccountCards) ...[
+                        const SizedBox(height: 40),
+                        _WalletCreatedAccountCards(mainAccountName: accountName, l10n: l10n),
+                      ] else ...[
+                        const SizedBox(height: 32),
+                        if (isWalletRelated) ...[
+                          Text(
+                            accountName,
+                            textAlign: TextAlign.center,
+                            style: text.caption.copyWith(color: colors.textMuted),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Column(
+                            children: [
+                              ref
+                                  .watch(checksumNameProvider(accountId))
+                                  .when(
+                                    data: (checksum) => Text(
+                                      checksum,
+                                      textAlign: TextAlign.center,
+                                      style: text.body.copyWith(color: colors.semanticLilac),
+                                    ),
+                                    loading: () => const Loader(size: 14),
+                                    error: (_, _) => const SizedBox.shrink(),
+                                  ),
+                              const SizedBox(height: 4),
+                              Text(
+                                AddressFormattingService.formatAddress(
+                                  accountId,
+                                  prefix: 8,
+                                  ellipses: '.......',
+                                  postFix: 10,
+                                ).toLowerCase(),
+                                textAlign: TextAlign.center,
+                                style: text.dataAddressLarge.copyWith(color: colors.textContent),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -138,11 +146,75 @@ class AccountReadyScreen extends ConsumerWidget {
         bottomContent: ScaffoldBaseBottomContent(
           child: QuantusButton.simple(
             key: const Key(E2EKeys.accountReadyDoneButton),
-            label: l10n.accountReadyDone,
+            label: ctaLabel,
             onTap: () => _goHome(context),
             variant: ButtonVariant.primary,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _WalletCreatedAccountCards extends StatelessWidget {
+  const _WalletCreatedAccountCards({required this.mainAccountName, required this.l10n});
+
+  final String mainAccountName;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final encryptedName = l10n.createAccountEncryptedDefaultName;
+
+    return Column(
+      children: [
+        _AccountPreviewCard(
+          leading: AccountBadge(name: mainAccountName),
+          title: mainAccountName,
+          description: l10n.accountReadyMainAccountDescription,
+        ),
+        const SizedBox(height: 14),
+        _AccountPreviewCard(
+          leading: const EncryptedLockBadge(),
+          title: encryptedName,
+          description: l10n.accountReadyEncryptedAccountDescription,
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountPreviewCard extends StatelessWidget {
+  const _AccountPreviewCard({required this.leading, required this.title, required this.description});
+
+  final Widget leading;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
+      child: Row(
+        children: [
+          leading,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: text.headingRow.copyWith(color: colors.textContent)),
+                const SizedBox(height: 4),
+                Text(description, style: text.caption.copyWith(color: colors.textMuted)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

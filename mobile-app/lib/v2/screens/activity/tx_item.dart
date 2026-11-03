@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:quantus_sdk/quantus_sdk.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
+import 'package:resonance_network_wallet/providers/currency_display_provider.dart';
 import 'package:resonance_network_wallet/shared/extensions/transaction_event_extension.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
+import 'package:resonance_network_wallet/v2/components/amount_display_with_conversion.dart';
 
 class TxItemData {
   final String label;
@@ -36,17 +36,23 @@ class TxItemData {
     this.counterpartyDirectionLabel,
   });
 
-  factory TxItemData.from(TransactionEvent tx, String accountId, AppColorsV2 colors, AppLocalizations l10n) {
+  factory TxItemData.from(
+    TransactionEvent tx,
+    String accountId,
+    AppColorsV3 colors,
+    AppLocalizations l10n, {
+    bool isPrivate = false,
+  }) {
     if (tx is PendingMultisigProposalEvent) {
       final recipient = AddressFormattingService.formatAddress(tx.recipient, prefix: 5, postFix: 3);
       return TxItemData(
         label: l10n.activityTxProposing,
         timeLabel: l10n.activityTxTimeNow,
-        iconBg: colors.txItemOutgoingHighlightBg,
-        iconColor: colors.checksum,
-        labelColor: colors.checksum,
-        amountColor: colors.checksum,
-        borderColor: colors.txItemOutgoingHighlightBorder,
+        iconBg: _glacierFill(colors),
+        iconColor: colors.semanticGlacier,
+        labelColor: colors.semanticGlacier,
+        amountColor: colors.semanticGlacier,
+        borderColor: _glacierStroke(colors),
         isSend: true,
         amount: tx.amount,
         counterpartyAddr: recipient,
@@ -60,10 +66,10 @@ class TxItemData {
         label: l10n.activityTxProposalCreated,
         timeLabel: _timeAgo(tx.timestamp, l10n),
         iconBg: Colors.transparent,
-        iconColor: colors.txItemIconDefault,
-        labelColor: colors.textPrimary,
-        amountColor: colors.textPrimary,
-        borderColor: colors.txItemBorderDefault,
+        iconColor: colors.textContent,
+        labelColor: colors.textContent,
+        amountColor: colors.textContent,
+        borderColor: colors.borderHairline,
         isSend: true,
         amount: tx.amount,
         counterpartyAddr: recipient,
@@ -78,10 +84,10 @@ class TxItemData {
         label: l10n.activityTxProposalApproved,
         timeLabel: _timeAgo(tx.timestamp, l10n),
         iconBg: Colors.transparent,
-        iconColor: colors.txItemIconDefault,
-        labelColor: colors.textPrimary,
-        amountColor: colors.textPrimary,
-        borderColor: colors.txItemBorderDefault,
+        iconColor: colors.textContent,
+        labelColor: colors.textContent,
+        amountColor: colors.textContent,
+        borderColor: colors.borderHairline,
         isSend: true,
         amount: fee,
         hideAmount: fee == BigInt.zero,
@@ -96,11 +102,11 @@ class TxItemData {
       return TxItemData(
         label: l10n.activityTxExecuting,
         timeLabel: l10n.activityTxTimeNow,
-        iconBg: colors.txItemOutgoingHighlightBg,
-        iconColor: colors.checksum,
-        labelColor: colors.checksum,
-        amountColor: colors.checksum,
-        borderColor: colors.txItemOutgoingHighlightBorder,
+        iconBg: _glacierFill(colors),
+        iconColor: colors.semanticGlacier,
+        labelColor: colors.semanticGlacier,
+        amountColor: colors.semanticGlacier,
+        borderColor: _glacierStroke(colors),
         isSend: true,
         amount: fee,
         hideAmount: fee == BigInt.zero,
@@ -116,10 +122,10 @@ class TxItemData {
         label: l10n.activityTxProposalExecuted,
         timeLabel: _timeAgo(tx.timestamp, l10n),
         iconBg: Colors.transparent,
-        iconColor: colors.txItemIconDefault,
-        labelColor: colors.textPrimary,
-        amountColor: colors.textPrimary,
-        borderColor: colors.txItemBorderDefault,
+        iconColor: colors.textContent,
+        labelColor: colors.textContent,
+        amountColor: colors.textContent,
+        borderColor: colors.borderHairline,
         isSend: true,
         amount: fee,
         hideAmount: fee == BigInt.zero,
@@ -134,11 +140,11 @@ class TxItemData {
       return TxItemData(
         label: l10n.activityTxCancelling,
         timeLabel: l10n.activityTxTimeNow,
-        iconBg: colors.txItemOutgoingHighlightBg,
-        iconColor: colors.checksum,
-        labelColor: colors.checksum,
-        amountColor: colors.checksum,
-        borderColor: colors.txItemOutgoingHighlightBorder,
+        iconBg: _glacierFill(colors),
+        iconColor: colors.semanticGlacier,
+        labelColor: colors.semanticGlacier,
+        amountColor: colors.semanticGlacier,
+        borderColor: _glacierStroke(colors),
         isSend: true,
         amount: fee,
         hideAmount: fee == BigInt.zero,
@@ -154,10 +160,10 @@ class TxItemData {
         label: l10n.activityTxProposalCancelled,
         timeLabel: _timeAgo(tx.timestamp, l10n),
         iconBg: Colors.transparent,
-        iconColor: colors.txItemIconDefault,
-        labelColor: colors.textPrimary,
-        amountColor: colors.textPrimary,
-        borderColor: colors.txItemBorderDefault,
+        iconColor: colors.textContent,
+        labelColor: colors.textContent,
+        amountColor: colors.textContent,
+        borderColor: colors.borderHairline,
         isSend: true,
         amount: fee,
         hideAmount: fee == BigInt.zero,
@@ -171,10 +177,10 @@ class TxItemData {
         label: l10n.activityTxProposal,
         timeLabel: _timeAgo(tx.timestamp, l10n),
         iconBg: Colors.transparent,
-        iconColor: colors.txItemIconDefault,
-        labelColor: colors.textPrimary,
-        amountColor: colors.textPrimary,
-        borderColor: colors.txItemBorderDefault,
+        iconColor: colors.textContent,
+        labelColor: colors.textContent,
+        amountColor: colors.textContent,
+        borderColor: colors.borderHairline,
         isSend: true,
         amount: tx.amount,
         counterpartyAddr: AddressFormattingService.formatAddress(tx.to, prefix: 5, postFix: 3),
@@ -187,11 +193,11 @@ class TxItemData {
       return TxItemData(
         label: l10n.activityTxMultisigCreating,
         timeLabel: l10n.activityTxTimeNow,
-        iconBg: colors.txItemOutgoingHighlightBg,
-        iconColor: colors.checksum,
-        labelColor: colors.checksum,
-        amountColor: colors.checksum,
-        borderColor: colors.txItemOutgoingHighlightBorder,
+        iconBg: _glacierFill(colors),
+        iconColor: colors.semanticGlacier,
+        labelColor: colors.semanticGlacier,
+        amountColor: colors.semanticGlacier,
+        borderColor: _glacierStroke(colors),
         isSend: true,
         amount: tx.totalCost,
         counterpartyAddr: address,
@@ -206,10 +212,10 @@ class TxItemData {
         label: l10n.activityTxMultisigCreated,
         timeLabel: _timeAgo(tx.timestamp, l10n),
         iconBg: Colors.transparent,
-        iconColor: colors.txItemIconDefault,
-        labelColor: colors.textPrimary,
-        amountColor: colors.textPrimary,
-        borderColor: colors.txItemBorderDefault,
+        iconColor: colors.textContent,
+        labelColor: colors.textContent,
+        amountColor: colors.textContent,
+        borderColor: colors.borderHairline,
         isSend: true,
         amount: tx.totalCost,
         counterpartyAddr: address,
@@ -225,22 +231,22 @@ class TxItemData {
 
     String getLabel() {
       if (isPending && isSend) {
-        return l10n.activityTxSending;
+        return isPrivate ? l10n.activityTxPrivatelySending : l10n.activityTxSending;
       }
       if (isPending && !isSend) {
-        return l10n.activityTxReceiving;
+        return isPrivate ? l10n.activityTxPrivatelyReceiving : l10n.activityTxReceiving;
       }
       if (isScheduled && isSend) {
         return l10n.activityTxPending;
       }
       if (isScheduled && !isSend) {
-        return l10n.activityTxReceiving;
+        return isPrivate ? l10n.activityTxPrivatelyReceiving : l10n.activityTxReceiving;
       }
       if (isSend && !isScheduled) {
-        return l10n.activityTxSent;
+        return isPrivate ? l10n.activityTxPrivateSent : l10n.activityTxSent;
       }
 
-      return l10n.activityTxReceived;
+      return isPrivate ? l10n.activityTxPrivateReceived : l10n.activityTxReceived;
     }
 
     String getTimeLabel() {
@@ -255,55 +261,55 @@ class TxItemData {
 
     Color getIconBg() {
       if (isHighlighted && !isSend) {
-        return colors.txItemIncomingHighlightBg;
+        return _sageFill(colors);
       }
       if (isHighlighted && isSend) {
-        return colors.txItemOutgoingHighlightBg;
+        return _glacierFill(colors);
       }
       return Colors.transparent;
     }
 
     Color getIconColor() {
       if (isHighlighted && !isSend) {
-        return colors.success;
+        return colors.semanticSage;
       }
       if (isHighlighted && isSend) {
-        return colors.checksum;
+        return colors.semanticGlacier;
       }
-      return colors.txItemIconDefault;
+      return colors.textContent;
     }
 
     Color getLabelColor() {
       if (isHighlighted && !isSend) {
-        return colors.success;
+        return colors.semanticSage;
       }
       if (isHighlighted && isSend) {
-        return colors.checksum;
+        return colors.semanticGlacier;
       }
 
-      return colors.textPrimary;
+      return colors.textContent;
     }
 
     Color getAmountColor() {
       if (!isSend) {
-        return colors.success;
+        return colors.semanticSage;
       }
 
       if (isHighlighted && isSend) {
-        return colors.checksum;
+        return colors.semanticGlacier;
       }
 
-      return colors.textPrimary;
+      return colors.textContent;
     }
 
     Color getBorderColor() {
       if (isHighlighted && !isSend) {
-        return colors.txItemIncomingHighlightBorder;
+        return _sageStroke(colors);
       }
       if (isHighlighted && isSend) {
-        return colors.txItemOutgoingHighlightBorder;
+        return _glacierStroke(colors);
       }
-      return colors.txItemBorderDefault;
+      return colors.borderHairline;
     }
 
     return TxItemData(
@@ -321,11 +327,23 @@ class TxItemData {
   }
 }
 
+/// Amount text for a transaction row.
+///
+/// [isHidden] is passed down by the screen that owns the hide-balances toggle;
+/// the amount formatter has no notion of hidden balances.
+String txItemAmountText(TxItemData data, TxAmountFormatter format, {bool isHidden = false}) {
+  if (isHidden) return hiddenAmountText;
+  if (data.hideAmount) return '—';
+
+  return format(data.amount, isSend: data.isSend).primaryAmount;
+}
+
 Widget buildTxItem(
   TransactionEvent tx,
   TxItemData data,
-  AppColorsV2 colors,
-  AppTextTheme text,
+  AppColorsV3 colors,
+  AppTextThemeV3 text,
+  AppRadiusV3 radius,
   AppLocalizations l10n, {
   required String formattedAmount,
   required bool isLastItem,
@@ -341,7 +359,7 @@ Widget buildTxItem(
     child: Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
           child: Row(
             children: [
               Container(
@@ -349,14 +367,14 @@ Widget buildTxItem(
                 height: 36,
                 decoration: BoxDecoration(
                   color: data.iconBg,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: radius.xsBorder,
                   border: Border.all(color: data.borderColor, width: 1.5),
                 ),
                 child: data.customIcon != null
-                    ? Icon(data.customIcon, size: 16, color: data.iconColor)
+                    ? Icon(data.customIcon, size: 14, color: data.iconColor)
                     : Transform.rotate(
                         angle: data.isSend ? 3.14159 : 0,
-                        child: Icon(Icons.arrow_downward_rounded, size: 16, color: data.iconColor),
+                        child: Icon(Icons.arrow_downward_rounded, size: 14, color: data.iconColor),
                       ),
               ),
               const SizedBox(width: 12),
@@ -364,37 +382,39 @@ Widget buildTxItem(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(data.label, style: text.paragraph?.copyWith(color: data.labelColor)),
-                    const SizedBox(height: 2),
-                    Text(data.timeLabel, style: text.detail?.copyWith(color: colors.textTertiary)),
+                    Text(data.label, style: text.bodyLarge.copyWith(color: data.labelColor)),
+                    const SizedBox(height: 8),
+                    Text(data.timeLabel, style: text.caption.copyWith(color: colors.textMuted)),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    formattedAmount,
-                    style: text.paragraph?.copyWith(
-                      color: data.amountColor,
-                      fontFamily: AppTextTheme.fontFamilySecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
+                  Text(formattedAmount, style: text.bodyLarge.copyWith(color: data.amountColor)),
+                  const SizedBox(height: 8),
                   Text(
                     '$directionLabel: ${data.counterpartyAddr}',
-                    style: text.detail?.copyWith(color: colors.textTertiary),
+                    style: text.caption.copyWith(color: colors.textMuted),
                   ),
                 ],
               ),
             ],
           ),
         ),
-        if (!isLastItem) Divider(color: colors.txItemSeparator, height: 1),
+        if (!isLastItem) Divider(color: colors.borderHairline, height: 1),
       ],
     ),
   );
 }
+
+Color _sageFill(AppColorsV3 colors) => colors.semanticSage.useOpacity(0.08);
+
+Color _sageStroke(AppColorsV3 colors) => colors.semanticSage.useOpacity(0.15);
+
+Color _glacierFill(AppColorsV3 colors) => colors.semanticGlacier.useOpacity(0.08);
+
+Color _glacierStroke(AppColorsV3 colors) => colors.semanticGlacier.useOpacity(0.15);
 
 String _formatDuration(Duration d, AppLocalizations l10n) {
   final days = d.inDays.toString().padLeft(2, '0');
@@ -411,11 +431,14 @@ String _timeAgo(DateTime timestamp, AppLocalizations l10n) {
   return l10n.activityTxTimeDaysAgo(diff.inDays);
 }
 
-String dateGroupLabel(DateTime date, AppLocalizations l10n, String localeName) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final txDay = DateTime(date.year, date.month, date.day);
-  final diff = today.difference(txDay).inDays;
+/// Calendar days from [from] to [to], comparing date components only. Normalizing
+/// through UTC keeps daylight-saving days, which elapse in 23 or 25 hours, one day apart.
+int calendarDaysBetween(DateTime from, DateTime to) =>
+    DateTime.utc(to.year, to.month, to.day).difference(DateTime.utc(from.year, from.month, from.day)).inDays;
+
+String dateGroupLabel(DateTime date, AppLocalizations l10n, String localeName, {DateTime? now}) {
+  // Indexer timestamps are UTC; group by the day the user saw, not the UTC day.
+  final diff = calendarDaysBetween(date.toLocal(), (now ?? DateTime.now()).toLocal());
   if (diff == 0) return l10n.activityDateToday;
   if (diff == 1) return l10n.activityDateYesterday;
   return DatetimeFormattingService.formatDateGroupLabel(date, localeName);

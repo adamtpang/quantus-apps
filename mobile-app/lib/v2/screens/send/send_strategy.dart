@@ -40,9 +40,8 @@ sealed class SendFee {
 
 class RegularFee extends SendFee {
   final BigInt networkFee;
-  final int blockHeight;
 
-  const RegularFee({required this.networkFee, required this.blockHeight});
+  const RegularFee({required this.networkFee});
 
   @override
   BigInt get displayFee => networkFee;
@@ -55,6 +54,22 @@ class ProposeFee extends SendFee {
 
   @override
   BigInt get displayFee => breakdown.memberCost;
+}
+
+/// Why an encrypted send can't be built for the entered amount.
+enum EncryptedSendBlocker { notQuantized, insufficient, belowBatchMinimum }
+
+/// Fee for an encrypted (wormhole) send: the in-circuit volume fee plus
+/// quantization dust, carried with the coin-selection [plan] that produced it.
+/// When the amount can't be planned, [blocker] says why.
+class EncryptedFee extends SendFee {
+  final WormholeSpendPlan? plan;
+  final EncryptedSendBlocker? blocker;
+
+  const EncryptedFee({this.plan, this.blocker});
+
+  @override
+  BigInt get displayFee => plan?.feeToken ?? BigInt.zero;
 }
 
 /// Content for the shared terminal (success) screen. All strings are resolved
@@ -122,6 +137,19 @@ class SendNeedsHardwareSignature extends SendOutcome {
   const SendNeedsHardwareSignature({required this.session, required this.terminal});
 }
 
+/// Encrypted send authenticated and planned: hand off to the proving progress
+/// screen, which generates the ZK proofs, submits and then shows [terminal].
+/// [amount] is the confirmed amount; the controller re-checks it against
+/// [plan] before proving, since the plan pays exactly its own amountToken.
+class SendNeedsProving extends SendOutcome {
+  final Account account;
+  final WormholeSpendPlan plan;
+  final BigInt amount;
+  final SendTerminalContent terminal;
+
+  const SendNeedsProving({required this.account, required this.plan, required this.amount, required this.terminal});
+}
+
 /// Submission failed or was not authenticated; show [message] inline.
 class SendFailed extends SendOutcome {
   final String message;
@@ -129,22 +157,60 @@ class SendFailed extends SendOutcome {
   const SendFailed(this.message);
 }
 
+/// Terminal content for a completed transfer, shared by the flows that send a
+/// fixed amount to one recipient (regular and encrypted sends).
+SendTerminalContent buildSentTerminalContent(
+  AppLocalizations l10n,
+  NumberFormattingService fmt, {
+  required String recipient,
+  required String checksum,
+  required BigInt amount,
+  required bool isPayMode,
+}) {
+  final n = fmt.formatBalance(amount, smartDecimals: 4);
+  return SendTerminalContent(
+    title: isPayMode ? l10n.sendPayTitle : l10n.sendTitle,
+    headline: isPayMode
+        ? l10n.sendTxSubmittedHeadlinePaid(n, AppConstants.tokenSymbol)
+        : l10n.sendTxSubmittedHeadlineSent(n, AppConstants.tokenSymbol),
+    subline: l10n.sendTxSubmittedOnItsWay,
+    recipientAddress: recipient,
+    recipientChecksum: checksum,
+    doneLabel: l10n.sendTxSubmittedDone,
+    topSpacing: 70,
+  );
+}
+
 /// Encapsulates everything that differs between the send and multisig-propose
 /// flows so the recipient, amount, review and terminal screens can be shared.
 abstract class SendStrategy {
   const SendStrategy();
 
+  /// Whether the recipient screen shows the "Private Send" notice above the
+  /// continue button. Only encrypted (wormhole) sends enable this.
+  bool get showPrivateSendNotice => false;
+
   /// Account the funds leave from; the recipient must differ (self-guard) and
   /// it is excluded from the recents list. Resolved via `ref.read`.
   String? sourceAccountId(WidgetRef ref);
 
+  /// Self-send guard: whether [address] belongs to the sending account itself.
+  /// Defaults to comparing against [sourceAccountId]; encrypted sends also
+  /// treat every derived wormhole address of the wallet as self.
+  Future<bool> isSelfRecipient(WidgetRef ref, String address) async => address == sourceAccountId(ref);
+
   SendStrings strings(AppLocalizations l10n);
 
-  /// Balance the amount is drawn from. Exposed as a provider so the amount
-  /// screen can watch it in `build` and read it in event handlers.
+  /// Balance the amount is drawn from. Used for validation and the Max button.
   ProviderListenable<AsyncValue<BigInt>> get spendableBalanceProvider;
 
-  /// Whether a secondary balance used for gating is still loading. Watched.
+  /// Balance shown as "Available Balance" on the amount screen. Defaults to
+  /// [spendableBalanceProvider]; encrypted sends override this to show the
+  /// total wormhole balance (matching the home screen) while keeping
+  /// [spendableBalanceProvider] for validation and Max.
+  ProviderListenable<AsyncValue<BigInt>> get displayBalanceProvider => spendableBalanceProvider;
+
+  /// Whether a secondary balance used for gating has no value yet. Watched.
   bool extraBalancesLoading(WidgetRef ref);
 
   /// Portion of [fee] charged against the spendable balance (drives the
@@ -159,9 +225,13 @@ abstract class SendStrategy {
   /// Label for the fee payer balance line (e.g. "Your Balance:").
   String? feePayerBalanceLabel(AppLocalizations l10n) => null;
 
-  /// Estimates the fee for [amount] to [recipient]. Uses `ref.read`. Handles
-  /// the zero/invalid-amount estimate internally.
-  Future<SendFee> estimateFee(WidgetRef ref, {required String recipient, required BigInt amount});
+  /// Authoritative fee for sending [amount] to [recipient]. Watched by the
+  /// amount screen, so it recomputes as the amount changes; strategies derive
+  /// it from local state wherever the runtime makes that possible.
+  ProviderListenable<AsyncValue<SendFee>> feeProvider({required String recipient, required BigInt amount});
+
+  /// Re-queries whatever source [feeProvider] failed on.
+  void retryFee(WidgetRef ref, {required String recipient, required BigInt amount});
 
   /// Affordability gate beyond `amount <= spendable` (e.g. the proposing member
   /// must cover the proposal cost). Returns an error label, or null when ok or
@@ -176,6 +246,12 @@ abstract class SendStrategy {
     required BigInt amount,
     required SendFee fee,
   });
+
+  /// Called while the user is on the review screen (and periodically until it
+  /// closes). Strategies that hand off to hardware signing warm the Keystone
+  /// sign cache here so the QR screen renders instantly. No-op for flows that
+  /// sign locally. Uses `ref.read`.
+  Future<void> prefetchSignPayload(WidgetRef ref, {required String recipientAddress, required BigInt amount}) async {}
 
   /// Authenticates and submits. Uses `ref.read`. Never navigates.
   Future<SendOutcome> submit(

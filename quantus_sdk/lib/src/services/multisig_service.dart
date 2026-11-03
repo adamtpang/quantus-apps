@@ -1,10 +1,11 @@
 import 'dart:convert';
 
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:quantus_sdk/generated/planck/pallets/multisig.dart' show Constants, Txs;
+import 'package:quantus_sdk/generated/planck/planck.dart' show Planck;
 import 'package:quantus_sdk/generated/planck/types/quantus_runtime/runtime_call.dart';
+import 'package:quantus_sdk/src/chain/call_decoder.dart';
+import 'package:quantus_sdk/src/chain/call_policy.dart';
 import 'package:quantus_sdk/src/constants/app_constants.dart';
 import 'package:quantus_sdk/src/models/account.dart';
 import 'package:quantus_sdk/src/models/json_dynamic_parse.dart';
@@ -218,18 +219,22 @@ class MultisigService {
     if (signers.length < minSigners) {
       throw ArgumentError.value(signers, 'signers', 'At least $minSigners signer(s) are required');
     }
+    if (signers.length != signers.toSet().length) {
+      throw ArgumentError.value(signers, 'signers', 'Duplicate signers are not allowed');
+    }
     if (threshold < 1 || threshold > signers.length) {
       throw ArgumentError.value(threshold, 'threshold', 'Must be between 1 and ${signers.length}');
     }
   }
 
   /// Proposals with active or approved status.
-  Future<List<MultisigProposal>> getOpenProposals(MultisigAccount msig) {
-    return _fetchProposals(
+  Future<List<MultisigProposal>> getOpenProposals(MultisigAccount msig) async {
+    final proposals = await _fetchProposals(
       msig,
       query: MultisigProposalGraphql.openProposalsQuery,
       variables: MultisigProposalGraphql.buildOpenProposalsVariables(msig.accountId),
     );
+    return _withOnChainCallData(msig, proposals);
   }
 
   /// Proposals with executed, cancelled, or removed status.
@@ -286,7 +291,43 @@ class MultisigService {
     if (rows is! List || rows.isEmpty) return null;
     final first = rows.first;
     if (first is! Map<String, dynamic>) return null;
-    return MultisigProposal.fromIndexerJson(first, msig: msig);
+    final proposal = MultisigProposal.fromIndexerJson(first, msig: msig);
+    return (await _withOnChainCallData(msig, [proposal])).first;
+  }
+
+  /// Replaces indexer-supplied call data of open proposals with the
+  /// authoritative bytes from `Multisig.Proposals` storage, so browsing
+  /// surfaces (proposal rows, detail sheet) show what the chain will execute.
+  ///
+  /// A stored call that is not a plain transfer clears the indexer transfer
+  /// details instead of showing unverified ones; [MultisigProposal.callRaw]
+  /// still carries the bytes for the decoded-call view. Falls back to indexer
+  /// data when the chain query fails — approving stays gated on
+  /// [fetchProposalCallBytes] regardless.
+  Future<List<MultisigProposal>> _withOnChainCallData(MultisigAccount msig, List<MultisigProposal> proposals) async {
+    final open = proposals.where((p) => p.isOpen).toList();
+    final provider = _substrateService.provider;
+    if (open.isEmpty || provider == null) return proposals;
+
+    try {
+      final queries = Planck(provider).query.multisig;
+      final multisigId = getAccountId32(msig.accountId);
+      final stored = await Future.wait(open.map((p) => queries.proposals(multisigId, p.id)));
+      final callById = <int, Uint8List>{
+        for (var i = 0; i < open.length; i++)
+          if (stored[i] != null) open[i].id: Uint8List.fromList(stored[i]!.call),
+      };
+      return proposals.map((p) {
+        final call = callById[p.id];
+        if (call == null) return p;
+        final withBytes = p.copyWith(callRaw: call);
+        final summary = withBytes.decodedCall?.summary;
+        return withBytes.copyWith(recipient: summary?.recipient ?? '', amount: summary?.amount ?? BigInt.zero);
+      }).toList();
+    } catch (e) {
+      debugPrint('[MultisigService] Failed to load on-chain proposal calls: $e');
+      return proposals;
+    }
   }
 
   Future<int> currentBlockNumber() => _substrateService.getCurrentBlockNumber();
@@ -356,18 +397,46 @@ class MultisigService {
     return _substrateService.submitExtrinsic(signer, call);
   }
 
+  /// Reads the stored inner call of [proposalId] from chain storage.
+  ///
+  /// `multisig.approve` only counts an approval whose resubmitted call bytes are
+  /// byte-equal to the stored payload, which is what lets an offline signer read
+  /// what it is approving instead of trusting a proposal id. Chain storage is
+  /// therefore the only source we approve from; [MultisigProposal.callRaw] (from
+  /// the indexer) is a display fallback, never a signing input.
+  ///
+  /// Throws if the proposal is unknown — never approve with guessed bytes.
+  Future<List<int>> fetchProposalCallBytes({required MultisigAccount msig, required int proposalId}) async {
+    final provider = _substrateService.provider;
+    if (provider == null) throw Exception('No RPC endpoint available to read multisig proposal $proposalId');
+
+    final stored = await Planck(provider).query.multisig.proposals(getAccountId32(msig.accountId), proposalId);
+    if (stored == null) {
+      throw Exception('Multisig proposal $proposalId not found on chain for ${msig.accountId}');
+    }
+    return stored.call;
+  }
+
   /// Builds the `multisig.approve` runtime call for [proposalId].
-  Multisig buildApproveCall({required MultisigAccount msig, required int proposalId}) {
-    return const Txs().approve(multisigAddress: getAccountId32(msig.accountId), proposalId: proposalId);
+  ///
+  /// [call] must be the proposal's stored inner call bytes — see
+  /// [fetchProposalCallBytes]. The chain rejects an approval whose bytes differ.
+  Multisig buildApproveCall({required MultisigAccount msig, required int proposalId, required List<int> call}) {
+    return const Txs().approve(multisigAddress: getAccountId32(msig.accountId), proposalId: proposalId, call: call);
   }
 
   /// Estimates the network fee for approving [proposalId].
+  ///
+  /// Fee scales with the inner call size, so [callBytes] is fetched when not
+  /// supplied by the caller.
   Future<BigInt> estimateApproveFee({
     required MultisigAccount msig,
     required Account signer,
     required int proposalId,
+    List<int>? callBytes,
   }) async {
-    final call = buildApproveCall(msig: msig, proposalId: proposalId);
+    final inner = callBytes ?? await fetchProposalCallBytes(msig: msig, proposalId: proposalId);
+    final call = buildApproveCall(msig: msig, proposalId: proposalId, call: inner);
     final feeData = await _substrateService.getFeeForCall(signer, call);
     return feeData.fee;
   }
@@ -377,23 +446,44 @@ class MultisigService {
     required MultisigAccount msig,
     required Account signer,
     required int proposalId,
+    List<int>? callBytes,
   }) async {
-    final call = buildApproveCall(msig: msig, proposalId: proposalId);
+    final inner = callBytes ?? await fetchProposalCallBytes(msig: msig, proposalId: proposalId);
+    final call = buildApproveCall(msig: msig, proposalId: proposalId, call: inner);
     return _substrateService.submitExtrinsic(signer, call);
   }
 
   /// Builds the `multisig.execute` runtime call for [proposalId].
-  Multisig buildExecuteCall({required MultisigAccount msig, required int proposalId}) {
-    return const Txs().execute(multisigAddress: getAccountId32(msig.accountId), proposalId: proposalId);
+  ///
+  /// [call] must be the proposal's stored inner call bytes — see
+  /// [fetchProposalCallBytes]. The chain dispatches only a call that re-encodes
+  /// to them, which is what lets the executor read what they are dispatching
+  /// instead of signing an opaque proposal id.
+  ///
+  /// Unlike `approve`, which resubmits the bytes length-prefixed, `execute`
+  /// carries the call itself, so the stored bytes are decoded here. A proposal
+  /// the bundled metadata cannot read fails now, before signing, rather than
+  /// building a call the chain would reject.
+  Multisig buildExecuteCall({required MultisigAccount msig, required int proposalId, required List<int> call}) {
+    return const Txs().execute(
+      multisigAddress: getAccountId32(msig.accountId),
+      proposalId: proposalId,
+      call: CallDecoder.decodeRuntimeCall(call, policy: const WalletCallPolicy(), within: CallIds.insideProposal),
+    );
   }
 
   /// Estimates the network fee for executing [proposalId].
+  ///
+  /// Fee scales with the inner call size, so [callBytes] is fetched when not
+  /// supplied by the caller.
   Future<BigInt> estimateExecuteFee({
     required MultisigAccount msig,
     required Account signer,
     required int proposalId,
+    List<int>? callBytes,
   }) async {
-    final call = buildExecuteCall(msig: msig, proposalId: proposalId);
+    final inner = callBytes ?? await fetchProposalCallBytes(msig: msig, proposalId: proposalId);
+    final call = buildExecuteCall(msig: msig, proposalId: proposalId, call: inner);
     final feeData = await _substrateService.getFeeForCall(signer, call);
     return feeData.fee;
   }
@@ -403,8 +493,10 @@ class MultisigService {
     required MultisigAccount msig,
     required Account signer,
     required int proposalId,
+    List<int>? callBytes,
   }) async {
-    final call = buildExecuteCall(msig: msig, proposalId: proposalId);
+    final inner = callBytes ?? await fetchProposalCallBytes(msig: msig, proposalId: proposalId);
+    final call = buildExecuteCall(msig: msig, proposalId: proposalId, call: inner);
     return _substrateService.submitExtrinsic(signer, call);
   }
 

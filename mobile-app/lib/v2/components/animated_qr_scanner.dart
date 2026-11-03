@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_icon_button.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
+import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:resonance_network_wallet/shared/utils/print.dart';
 
 /// Sequence metadata encoded in one frame of an animated QR payload.
 class AnimatedQrSequence {
@@ -24,9 +22,17 @@ class AnimatedQrScanner extends StatefulWidget {
   final bool Function(String part) acceptsPart;
   final bool Function(List<String> parts) isComplete;
   final Future<void> Function(List<String> parts) onComplete;
-  final FutureOr<void> Function(Object error, StackTrace stackTrace)? onError;
+  final FutureOr<void> Function(Object error)? onError;
   final AnimatedQrSequence? Function(String part)? sequenceForPart;
+
+  /// Frames this scanner will accumulate before giving up. Payload policy, like
+  /// [acceptsPart] and [isComplete], so this widget stays format-agnostic.
+  final int maxParts;
+  final String appBarTitle;
+  final String stepLabel;
+  final String title;
   final String instruction;
+  final String progressHeader;
   final String submittingLabel;
   final String Function(int scanned, int total) progressLabel;
   final String Function(int scanned) scanningLabel;
@@ -39,7 +45,12 @@ class AnimatedQrScanner extends StatefulWidget {
     required this.acceptsPart,
     required this.isComplete,
     required this.onComplete,
+    required this.maxParts,
+    required this.appBarTitle,
+    required this.stepLabel,
+    required this.title,
     required this.instruction,
+    required this.progressHeader,
     required this.submittingLabel,
     required this.progressLabel,
     required this.scanningLabel,
@@ -55,7 +66,13 @@ class AnimatedQrScanner extends StatefulWidget {
 }
 
 class _AnimatedQrScannerState extends State<AnimatedQrScanner> {
-  final MobileScannerController _controller = MobileScannerController();
+  // Unrestricted: the default DetectionSpeed.normal enforces a 250ms timeout
+  // between detections, capping an animated QR at ~4 frames/second. Duplicate
+  // deliveries are cheap — parts dedupe through the set below.
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.unrestricted,
+    formats: const [BarcodeFormat.qrCode],
+  );
   final Set<String> _parts = {};
   final Set<int> _seenSequenceIndexes = {};
 
@@ -72,7 +89,16 @@ class _AnimatedQrScannerState extends State<AnimatedQrScanner> {
   void _onDetect(BarcodeCapture capture) {
     if (_done) return;
     final code = capture.barcodes.firstOrNull?.rawValue;
-    if (code == null || !widget.acceptsPart(code) || !_parts.add(code)) return;
+    if (code == null || !widget.acceptsPart(code)) return;
+    // maxParts bounds the accumulation set: a hostile animation could otherwise
+    // keep emitting distinct frames and grow memory without limit. Reaching it
+    // means the set can never complete, so report it and start over instead of
+    // dropping frames in silence.
+    if (_parts.length >= widget.maxParts) {
+      unawaited(_abortOverflowing());
+      return;
+    }
+    if (!_parts.add(code)) return;
 
     final sequence = widget.sequenceForPart?.call(code);
     if (sequence != null) {
@@ -89,6 +115,16 @@ class _AnimatedQrScannerState extends State<AnimatedQrScanner> {
     unawaited(_complete(parts));
   }
 
+  Future<void> _abortOverflowing() async {
+    quantusPrint('Animated QR scan limit hit: ${widget.maxParts} parts accumulated without completing');
+    setState(() {
+      _parts.clear();
+      _seenSequenceIndexes.clear();
+      _expectedParts = null;
+    });
+    await widget.onError?.call(StateError('Scan did not complete within ${widget.maxParts} frames'));
+  }
+
   Future<void> _complete(List<String> parts) async {
     if (_done) return;
     setState(() {
@@ -98,9 +134,9 @@ class _AnimatedQrScannerState extends State<AnimatedQrScanner> {
     try {
       await _controller.stop();
       await widget.onComplete(parts);
-    } catch (error, stackTrace) {
+    } catch (error) {
       try {
-        await widget.onError?.call(error, stackTrace);
+        await widget.onError?.call(error);
       } finally {
         if (mounted) {
           setState(() {
@@ -121,116 +157,192 @@ class _AnimatedQrScannerState extends State<AnimatedQrScanner> {
     if (builder == null || _done) return;
     try {
       await _complete(await builder());
-    } catch (error, stackTrace) {
-      await widget.onError?.call(error, stackTrace);
+    } catch (error) {
+      await widget.onError?.call(error);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final text = context.themeText;
-    final size = MediaQuery.of(context).size;
-    final frame = (size.width - 96).clamp(220.0, 300.0);
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+    final radius = context.radiusV3;
     final progress = _expectedParts == null ? null : (_seenSequenceIndexes.length / _expectedParts!).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          MobileScanner(controller: _controller, onDetect: _onDetect),
-          Center(
-            child: Container(
-              width: frame,
-              height: frame,
-              decoration: BoxDecoration(
-                border: Border.all(color: colors.accentOrange, width: 2),
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 20,
-            left: 16,
-            right: 16,
-            child: SafeArea(
-              child: Row(
-                children: [
-                  QuantusIconButton.rounded(
-                    icon: Icons.arrow_back,
-                    onTap: () => Navigator.pop(context),
-                    style: IconButtonStyle.glass,
-                  ),
-                  const Spacer(),
-                  QuantusIconButton.rounded(
-                    icon: Icons.flash_on,
-                    onTap: _controller.toggleTorch,
-                    style: IconButtonStyle.glass,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 48,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      backgroundColor: colors.bgVoid,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  widget.errorText ?? widget.instruction,
-                  style: text.paragraph?.copyWith(color: widget.errorText != null ? colors.error : Colors.white),
-                  textAlign: TextAlign.center,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: V2AppBar(title: widget.appBarTitle),
                 ),
-                const SizedBox(height: 16),
-                if (progress != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: colors.surface,
-                      color: colors.accentOrange,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.progressLabel(_seenSequenceIndexes.length, _expectedParts!),
-                    style: text.detail?.copyWith(color: Colors.white70),
-                  ),
-                ] else if (_parts.isNotEmpty)
-                  Text(widget.scanningLabel(_parts.length), style: text.detail?.copyWith(color: Colors.white70)),
-                if (widget.debugPartsBuilder != null && !_submitting) ...[
-                  const SizedBox(height: 16),
-                  QuantusButton.simple(
-                    label: widget.debugActionLabel,
-                    onTap: _simulateScan,
-                    variant: ButtonVariant.danger,
-                    width: null,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (_submitting)
-            Positioned.fill(
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.7),
-                child: Center(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircularProgressIndicator(color: colors.accentOrange),
-                      const SizedBox(height: 16),
-                      Text(widget.submittingLabel, style: text.paragraph?.copyWith(color: Colors.white)),
+                      Text(widget.stepLabel, style: text.labelData.copyWith(color: colors.accentFlare)),
+                      const SizedBox(height: 12),
+                      Text(widget.title, style: text.headingRow.copyWith(color: colors.textContent)),
+                      const SizedBox(height: 8),
+                      Text(widget.instruction, style: text.caption.copyWith(color: colors.textMuted)),
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: _cameraView(colors, radius),
+                  ),
+                ),
+                _bottomSection(colors, text, radius, progress),
+              ],
+            ),
+            if (_submitting)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: colors.bgVoid.useOpacity(0.7),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: colors.accentFlare),
+                        const SizedBox(height: 16),
+                        Text(widget.submittingLabel, style: text.body.copyWith(color: colors.textContent)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cameraView(AppColorsV3 colors, AppRadiusV3 radius) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: colors.borderHairline),
+        borderRadius: radius.mdBorder,
+      ),
+      child: ClipRRect(
+        borderRadius: radius.mdBorder,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final frame = (constraints.maxWidth - 96).clamp(160.0, 300.0);
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                MobileScanner(controller: _controller, onDetect: _onDetect),
+                Center(
+                  child: SizedBox(width: frame, height: frame, child: const _ScanBrackets()),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomSection(AppColorsV3 colors, AppTextThemeV3 text, AppRadiusV3 radius, double? progress) {
+    final progressText = progress != null
+        ? widget.progressLabel(_seenSequenceIndexes.length, _expectedParts!)
+        : (_parts.isNotEmpty ? widget.scanningLabel(_parts.length) : null);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 25, 24, 24),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: colors.borderHairline)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.errorText != null)
+            Text(widget.errorText!, style: text.caption.copyWith(color: colors.semanticEmber))
+          else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(widget.progressHeader, style: text.labelData.copyWith(color: colors.textMuted)),
+                if (progressText != null) Text(progressText, style: text.labelData.copyWith(color: colors.textContent)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: radius.xsBorder,
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 4,
+                backgroundColor: colors.bgSurface2,
+                color: colors.accentFlare,
               ),
             ),
+          ],
+          if (widget.debugPartsBuilder != null && !_submitting) ...[
+            const SizedBox(height: 16),
+            QuantusButton.simple(label: widget.debugActionLabel, onTap: _simulateScan, variant: ButtonVariant.danger),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// Corner brackets marking the scan region.
+class _ScanBrackets extends StatelessWidget {
+  const _ScanBrackets();
+
+  static const double _length = 28;
+  static const double _thickness = 2;
+
+  Widget _corner({required Color color, required Alignment alignment}) {
+    final horizontal = alignment.x < 0 ? Alignment.centerLeft : Alignment.centerRight;
+    return Align(
+      alignment: alignment,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: alignment.x < 0 ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        children: [
+          if (alignment.y < 0) ...[
+            _bar(color: color, vertical: true),
+            Align(
+              alignment: horizontal,
+              child: _bar(color: color, vertical: false),
+            ),
+          ] else ...[
+            Align(
+              alignment: horizontal,
+              child: _bar(color: color, vertical: false),
+            ),
+            _bar(color: color, vertical: true),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _bar({required Color color, required bool vertical}) {
+    return Container(width: vertical ? _thickness : _length, height: vertical ? _length : _thickness, color: color);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.colorsV3.textContent;
+    return Stack(
+      children: [
+        _corner(color: color, alignment: Alignment.topLeft),
+        _corner(color: color, alignment: Alignment.topRight),
+        _corner(color: color, alignment: Alignment.bottomLeft),
+        _corner(color: color, alignment: Alignment.bottomRight),
+      ],
     );
   }
 }

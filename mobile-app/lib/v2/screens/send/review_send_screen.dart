@@ -1,22 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/currency_display_provider.dart';
 import 'package:resonance_network_wallet/shared/constants/e2e_keys.dart';
+import 'package:resonance_network_wallet/shared/utils/print.dart';
 import 'package:resonance_network_wallet/shared/utils/url_utils.dart';
 import 'package:resonance_network_wallet/v2/components/address_checkphrase_with_initial.dart';
 import 'package:resonance_network_wallet/v2/components/amount_display_with_conversion.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base_bottom_content.dart';
 import 'package:resonance_network_wallet/v2/components/split_card.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
+import 'package:resonance_network_wallet/v2/screens/send/encrypted_send_progress_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/send/keystone_sign_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/send/send_strategy.dart';
 import 'package:resonance_network_wallet/v2/screens/send/send_terminal_screen.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class ReviewSendScreen extends ConsumerStatefulWidget {
   final SendStrategy strategy;
@@ -43,6 +43,31 @@ class ReviewSendScreen extends ConsumerStatefulWidget {
 class _ReviewSendScreenState extends ConsumerState<ReviewSendScreen> {
   bool _submitting = false;
   String? _errorMessage;
+  Timer? _prefetchTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Warm hardware-signing payloads while the user reviews, and keep them
+    // warm: a cache hit is a no-op, so the periodic tick only refetches once
+    // the mortal-era window has expired the cached entry.
+    _prefetchSignPayload();
+    _prefetchTimer = Timer.periodic(const Duration(seconds: 30), (_) => _prefetchSignPayload());
+  }
+
+  @override
+  void dispose() {
+    _prefetchTimer?.cancel();
+    super.dispose();
+  }
+
+  void _prefetchSignPayload() {
+    unawaited(
+      widget.strategy
+          .prefetchSignPayload(ref, recipientAddress: widget.recipientAddress.trim(), amount: widget.amount)
+          .catchError((Object e) => quantusPrint('Keystone payload prefetch failed: $e')),
+    );
+  }
 
   Future<void> _toggleFlip() async {
     await ref.read(isCurrencyFlippedProvider.notifier).toggle();
@@ -54,14 +79,21 @@ class _ReviewSendScreenState extends ConsumerState<ReviewSendScreen> {
       _errorMessage = null;
     });
 
-    final outcome = await widget.strategy.submit(
-      ref,
-      recipientAddress: widget.recipientAddress.trim(),
-      recipientChecksum: widget.recipientChecksum,
-      amount: widget.amount,
-      fee: widget.fee,
-      isPayMode: widget.isPayMode,
-    );
+    SendOutcome outcome;
+    try {
+      outcome = await widget.strategy.submit(
+        ref,
+        recipientAddress: widget.recipientAddress.trim(),
+        recipientChecksum: widget.recipientChecksum,
+        amount: widget.amount,
+        fee: widget.fee,
+        isPayMode: widget.isPayMode,
+      );
+    } catch (e, st) {
+      quantusPrint('Send submit error: $e\n$st');
+      if (!mounted) return;
+      outcome = SendFailed(ref.read(l10nProvider).sendReviewSubmitFailed);
+    }
     if (!mounted) return;
 
     switch (outcome) {
@@ -85,6 +117,20 @@ class _ReviewSendScreenState extends ConsumerState<ReviewSendScreen> {
                 SendTerminalScreen(content: terminal.copyWith(explorerUrl: explorerImmediateTransactionUrl(hash))),
           ),
         );
+      case SendNeedsProving(:final account, :final plan, :final amount, :final terminal):
+        setState(() => _submitting = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EncryptedSendProgressScreen(
+              account: account,
+              plan: plan,
+              amount: amount,
+              recipientAddress: widget.recipientAddress.trim(),
+              terminal: terminal,
+            ),
+          ),
+        );
       case SendFailed(:final message):
         setState(() {
           _submitting = false;
@@ -97,14 +143,14 @@ class _ReviewSendScreenState extends ConsumerState<ReviewSendScreen> {
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
     final strings = widget.strategy.strings(l10n);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final approxDisplay = ref.watch(txAmountDisplayProvider)(
       widget.amount,
       isSend: true,
       withSignPrefix: false,
-      withQuanSymbol: false,
-      quanDecimals: 4,
+      withTokenSymbol: false,
+      tokenDecimals: 4,
     );
 
     return ScaffoldBase(
@@ -113,7 +159,7 @@ class _ReviewSendScreenState extends ConsumerState<ReviewSendScreen> {
       mainContent: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _heroCard(colors, text, l10n, strings, approxDisplay),
+          _heroCard(l10n, strings, approxDisplay),
           const SizedBox(height: 28),
           Expanded(
             child: SingleChildScrollView(
@@ -131,7 +177,7 @@ class _ReviewSendScreenState extends ConsumerState<ReviewSendScreen> {
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 16),
-            Text(_errorMessage!, style: text.detail?.copyWith(color: colors.textError)),
+            Text(_errorMessage!, style: text.caption.copyWith(color: colors.semanticEmber)),
           ],
         ],
       ),
@@ -148,14 +194,10 @@ class _ReviewSendScreenState extends ConsumerState<ReviewSendScreen> {
     );
   }
 
-  Widget _heroCard(
-    AppColorsV2 colors,
-    AppTextTheme text,
-    AppLocalizations l10n,
-    SendStrings strings,
-    CurrencyDisplayState approxDisplay,
-  ) {
-    final sectionLabelStyle = text.receiveLabel?.copyWith(color: colors.textLabel);
+  Widget _heroCard(AppLocalizations l10n, SendStrings strings, CurrencyDisplayState approxDisplay) {
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+    final sectionLabelStyle = text.labelData.copyWith(color: colors.textMuted);
 
     return SplitCard(
       topChild: Column(

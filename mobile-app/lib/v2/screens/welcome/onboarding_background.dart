@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
+import 'package:quantus_sdk/quantus_sdk.dart';
 
 class OnboardingBackground extends StatelessWidget {
   const OnboardingBackground({super.key});
@@ -15,7 +15,7 @@ class OnboardingBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, context.colors.background],
+              colors: [Colors.transparent, context.colorsV3.bgVoid],
               stops: [0, 0.75],
             ),
           ),

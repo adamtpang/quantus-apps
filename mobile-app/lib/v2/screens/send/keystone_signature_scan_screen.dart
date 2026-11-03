@@ -23,29 +23,37 @@ class KeystoneSignatureScanScreen extends ConsumerStatefulWidget {
 }
 
 class _KeystoneSignatureScanScreenState extends ConsumerState<KeystoneSignatureScanScreen> {
-  static final RegExp _sequencePattern = RegExp(r'/(\d+)-(\d+)/');
-
   String? _error;
 
   AnimatedQrSequence? _sequenceForPart(String part) {
-    final match = _sequencePattern.firstMatch(part);
-    if (match == null) return null;
-    return AnimatedQrSequence(index: int.parse(match.group(1)!), total: int.parse(match.group(2)!));
+    final sequence = urSequenceFor(part);
+    if (sequence == null) return null;
+    return AnimatedQrSequence(index: sequence.index, total: sequence.total);
+  }
+
+  /// Refuses submission when the mortal era window is (nearly) over — the
+  /// chain would reject the extrinsic, or worse, accept it right at the edge.
+  Future<void> _ensureEraNotExpired() async {
+    final payload = widget.unsignedData.payloadToSign;
+    if (payload.eraPeriod == 0) return;
+    final currentBlock = await SubstrateService().getCurrentBlockNumber();
+    final expiryBlock = payload.blockNumber + payload.eraPeriod;
+    if (currentBlock >= expiryBlock - keystoneSignSubmitEraMarginBlocks) {
+      throw KeystoneEraExpiredException(currentBlock: currentBlock, expiryBlock: expiryBlock);
+    }
   }
 
   Future<void> _submit(List<String> parts) async {
     final bytes = decodeUr(urParts: parts);
-    final signatureSize = signatureBytes().toInt();
-    final expectedSize = signatureSize + publicKeyBytes().toInt();
-    if (bytes.length != expectedSize) {
-      throw Exception('Invalid signature length: expected $expectedSize bytes, got ${bytes.length}');
-    }
+    // Validates the length and identifies the signature scheme; the SDK reads it back off the blob.
+    DilithiumSchemeExtension.forSignatureWithPublicKeyLength(bytes.length);
+
+    await _ensureEraNotExpired();
 
     final hash = await widget.session.submitSigned(
       ref,
       unsignedData: widget.unsignedData,
-      signature: bytes.sublist(0, signatureSize),
-      publicKey: bytes.sublist(signatureSize),
+      signatureWithPublicKey: bytes,
     );
 
     ref.read(keystoneSignCacheProvider.notifier).reset();
@@ -54,17 +62,24 @@ class _KeystoneSignatureScanScreenState extends ConsumerState<KeystoneSignatureS
     Navigator.pop(context, hash);
   }
 
-  Future<void> _handleError(Object error, StackTrace stackTrace) async {
-    quantusDebugPrint('Keystone signature processing failed: $error');
-    TelemetryService().sendError('Keystone signature processing failed', error: error, stackTrace: stackTrace);
+  Future<void> _handleError(Object error) async {
+    quantusPrint('Keystone signature processing failed: $error');
+    TelemetryService().sendError('Keystone signature processing failed', error: error);
     ref.read(keystoneSignCacheProvider.notifier).reset();
     if (!mounted) return;
-    setState(() => _error = ref.read(l10nProvider).keystoneScanError);
+    final l10n = ref.read(l10nProvider);
+    setState(() => _error = error is KeystoneEraExpiredException ? l10n.keystoneScanExpired : l10n.keystoneScanError);
   }
 
   Future<List<String>> _simulateSignature() async {
-    final keypair = await widget.session.account.getKeypair();
-    final signed = signMessageWithPubkey(keypair: keypair, message: widget.unsignedData.encodedPayloadToSign);
+    final account = widget.session.account;
+    final mnemonic = (await account.getMnemonic())!;
+    final keypair = HdWalletService().keyPairAtIndex(mnemonic, account.index, DilithiumScheme.mlDsa87);
+    final signed = signMessageWithPubkey(
+      keypair: keypair,
+      message: widget.unsignedData.encodedPayloadToSign,
+      specVersion: widget.unsignedData.payloadToSign.specVersion,
+    );
     return encodeUr(data: signed);
   }
 
@@ -73,12 +88,17 @@ class _KeystoneSignatureScanScreenState extends ConsumerState<KeystoneSignatureS
     final l10n = ref.watch(l10nProvider);
 
     return AnimatedQrScanner(
-      acceptsPart: (part) => part.toLowerCase().startsWith('ur:'),
+      acceptsPart: isAcceptableUrPart,
+      maxParts: maxUrScanParts,
       isComplete: (parts) => isCompleteUr(urParts: parts),
       sequenceForPart: _sequenceForPart,
       onComplete: _submit,
       onError: _handleError,
+      appBarTitle: l10n.keystoneSignScreenTitle,
+      stepLabel: l10n.keystoneSignStep(3, 3),
+      title: l10n.keystoneScanTitle,
       instruction: l10n.keystoneScanInstruction,
+      progressHeader: l10n.keystoneScanReceiving,
       submittingLabel: l10n.keystoneScanSubmitting,
       progressLabel: l10n.keystoneScanProgress,
       scanningLabel: l10n.keystoneScanScanning,

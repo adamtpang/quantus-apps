@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
+import 'package:quantus_sdk/quantus_sdk.dart';
 
 class ShareAccountButton extends ConsumerWidget {
   final VoidCallback onTap;
@@ -18,7 +17,7 @@ class ShareAccountButton extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       label: l10n.componentShare,
       onTap: onTap,
-      icon: Icon(Icons.shortcut_rounded, size: 20, color: context.colors.background),
+      icon: Icon(Icons.shortcut_rounded, size: 20, color: context.colorsV3.textVoid),
       iconPlacement: IconPlacement.leading,
       isDisabled: isDisabled,
     );

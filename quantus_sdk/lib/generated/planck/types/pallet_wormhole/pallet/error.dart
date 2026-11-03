@@ -6,21 +6,36 @@ import 'package:polkadart/scale_codec.dart' as _i1;
 /// The `Error` enum of this pallet.
 enum Error {
   invalidPublicInputs('InvalidPublicInputs', 0),
+
+  /// No segment of the bundle is spendable: every non-dummy segment contains a
+  /// nullifier that is already used (or the single segment of a private-batch
+  /// proof does).
   nullifierAlreadyUsed('NullifierAlreadyUsed', 1),
-  blockNotFound('BlockNotFound', 2),
-  aggregatedVerifierNotAvailable('AggregatedVerifierNotAvailable', 3),
-  aggregatedProofDeserializationFailed('AggregatedProofDeserializationFailed', 4),
-  aggregatedVerificationFailed('AggregatedVerificationFailed', 5),
-  invalidAggregatedPublicInputs('InvalidAggregatedPublicInputs', 6),
+
+  /// The bundle has nothing to settle: only dummy (all-zero) padding, or
+  /// every valid segment exits zero. Distinct from [`Error::NullifierAlreadyUsed`],
+  /// which is a replay of real segments.
+  noValidSegments('NoValidSegments', 2),
+  blockNotFound('BlockNotFound', 3),
+  verifierNotAvailable('VerifierNotAvailable', 4),
+  proofDeserializationFailed('ProofDeserializationFailed', 5),
+
+  /// The submitted proof blob exceeds [`crate::MAX_PROOF_BYTES`]. Rejected before
+  /// any copy or parsing so oversized unsigned spam costs only a length check.
+  proofTooLarge('ProofTooLarge', 6),
+
+  /// The proof bytes are not the canonical serialization of the decoded proof
+  /// (e.g. a valid proof with trailing bytes, which the plonky2 parser would
+  /// silently ignore). Every proof has exactly one accepted byte encoding.
+  nonCanonicalProofEncoding('NonCanonicalProofEncoding', 7),
+  proofVerificationFailed('ProofVerificationFailed', 8),
+  invalidProofPublicInputs('InvalidProofPublicInputs', 9),
 
   /// The volume fee rate in the proof doesn't match the configured rate
-  invalidVolumeFeeRate('InvalidVolumeFeeRate', 7),
-
-  /// Transfer amount is below the minimum required
-  transferAmountBelowMinimum('TransferAmountBelowMinimum', 8),
+  invalidVolumeFeeRate('InvalidVolumeFeeRate', 10),
 
   /// Only native asset (asset_id = 0) is supported in this version
-  nonNativeAssetNotSupported('NonNativeAssetNotSupported', 9);
+  nonNativeAssetNotSupported('NonNativeAssetNotSupported', 11);
 
   const Error(this.variantName, this.codecIndex);
 
@@ -53,20 +68,24 @@ class $ErrorCodec with _i1.Codec<Error> {
       case 1:
         return Error.nullifierAlreadyUsed;
       case 2:
-        return Error.blockNotFound;
+        return Error.noValidSegments;
       case 3:
-        return Error.aggregatedVerifierNotAvailable;
+        return Error.blockNotFound;
       case 4:
-        return Error.aggregatedProofDeserializationFailed;
+        return Error.verifierNotAvailable;
       case 5:
-        return Error.aggregatedVerificationFailed;
+        return Error.proofDeserializationFailed;
       case 6:
-        return Error.invalidAggregatedPublicInputs;
+        return Error.proofTooLarge;
       case 7:
-        return Error.invalidVolumeFeeRate;
+        return Error.nonCanonicalProofEncoding;
       case 8:
-        return Error.transferAmountBelowMinimum;
+        return Error.proofVerificationFailed;
       case 9:
+        return Error.invalidProofPublicInputs;
+      case 10:
+        return Error.invalidVolumeFeeRate;
+      case 11:
         return Error.nonNativeAssetNotSupported;
       default:
         throw Exception('Error: Invalid variant index: "$index"');

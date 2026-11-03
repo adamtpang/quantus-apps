@@ -2,20 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
 import 'package:resonance_network_wallet/providers/account_providers.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/services/firebase_messaging_service.dart';
 import 'package:resonance_network_wallet/services/wallet_creation_service.dart';
 import 'package:resonance_network_wallet/shared/constants/e2e_keys.dart';
-import 'package:resonance_network_wallet/shared/extensions/toaster_extensions.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
 import 'package:resonance_network_wallet/v2/screens/accounts/account_ready_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/import/import_wallet_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/welcome/onboarding_background.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class WelcomeScreenV2 extends ConsumerStatefulWidget {
   const WelcomeScreenV2({super.key});
@@ -38,7 +35,9 @@ class _WelcomeScreenV2State extends ConsumerState<WelcomeScreenV2> {
       final mnemonic = await SubstrateService().generateMnemonic();
       if (mnemonic.isEmpty) throw Exception('Mnemonic generation returned empty.');
 
-      final address = HdWalletService().keyPairAtIndex(mnemonic, 0).ss58Address;
+      const scheme = DilithiumSchemeExtension.current;
+      final path = HdWalletService.pathForIndex(0, scheme);
+      final address = HdWalletService().keyPairAtPath(mnemonic, path, scheme).ss58Address;
 
       final accounts = ref.read(accountsProvider).value ?? <Account>[];
       await _walletCreationService.createNewWallet(
@@ -46,11 +45,15 @@ class _WelcomeScreenV2State extends ConsumerState<WelcomeScreenV2> {
         mnemonic: mnemonic,
         walletIndex: _walletIndex,
         accountId: address,
+        scheme: scheme,
+        derivationPath: path,
         existingAccounts: accounts,
       );
 
-      ref.invalidate(accountsProvider);
-      ref.invalidate(activeAccountProvider);
+      // Software wallets always get a companion encrypted (wormhole) account.
+      await ensureEncryptedAccounts(ref);
+
+      invalidateAccountProviders(ref);
       ref.invalidate(walletOriginProvider(_walletIndex));
       ref.invalidate(recoveryPhraseViewedProvider(_walletIndex));
 
@@ -81,6 +84,8 @@ class _WelcomeScreenV2State extends ConsumerState<WelcomeScreenV2> {
   @override
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
 
     return ScaffoldBase(
       key: const Key(E2EKeys.welcomeScreen),
@@ -91,8 +96,12 @@ class _WelcomeScreenV2State extends ConsumerState<WelcomeScreenV2> {
           Image.asset('assets/v2/quantus_orange_logo.png', height: 32),
           const SizedBox(height: 16),
           SizedBox(
-            width: 210,
-            child: Text(l10n.welcomeTagline, textAlign: TextAlign.center, style: context.themeText.mediumTitle),
+            width: 240,
+            child: Text(
+              l10n.welcomeTagline,
+              textAlign: TextAlign.center,
+              style: text.titleHero.copyWith(color: colors.textWhite),
+            ),
           ),
           const SizedBox(height: 56),
           QuantusButton.simple(
@@ -112,7 +121,7 @@ class _WelcomeScreenV2State extends ConsumerState<WelcomeScreenV2> {
                 builder: (_) => const ImportWalletScreenV2(),
               ),
             ),
-            variant: ButtonVariant.secondary,
+            variant: ButtonVariant.staged,
             isDisabled: _isCreating,
           ),
           const SizedBox(height: 40),

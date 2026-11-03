@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:resonance_network_wallet/providers/account_associations_providers.dart';
 import 'package:resonance_network_wallet/providers/route_intent_providers.dart';
+import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/shared/utils/print.dart';
 
 final deepLinkServiceProvider = Provider<DeepLinkService>((ref) {
@@ -22,49 +23,60 @@ class DeepLinkService {
   Future<void> init() async {
     // Handle links when the app is already open (warm state)
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      quantusDebugPrint('Received link while app is open: $uri');
-      _handleLink(uri);
+      quantusPrint('Received link while app is open: $uri');
+      handleLink(uri);
     });
 
     // Handle the link that opened the app (cold state)
     final initialUri = await _appLinks.getInitialLink();
     if (initialUri != null) {
-      quantusDebugPrint('Received initial link: $initialUri');
-      _handleLink(initialUri);
+      quantusPrint('Received initial link: $initialUri');
+      handleLink(initialUri);
     }
   }
 
-  void _handleLink(Uri uri) {
-    if (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'account') {
+  @visibleForTesting
+  void handleLink(Uri uri) {
+    final url = uri.toString();
+    // External input is trollable: reject over-long links before any parsing.
+    if (url.length > maxDeepLinkLength) {
+      quantusPrint('Ignoring over-long link (${url.length} chars)');
+      return;
+    }
+    final parts = decodedLinkParts(uri);
+    if (parts == null) return;
+
+    if (parts.path.isNotEmpty && parts.path.first == 'account') {
       String? accountId;
 
       // Check for new format: /account?id=123
-      if (uri.pathSegments.length == 1 && uri.queryParameters.containsKey('id')) {
-        accountId = uri.queryParameters['id'];
+      if (parts.path.length == 1 && parts.query.containsKey('id')) {
+        accountId = parts.query['id'];
       }
       // Check for old format: /account/123
-      else if (uri.pathSegments.length == 2) {
-        accountId = uri.pathSegments.last;
+      else if (parts.path.length == 2) {
+        accountId = parts.path.last;
       }
 
-      if (accountId != null && accountId.isNotEmpty) {
+      // Fail closed, same as address entry in the send flow.
+      if (accountId != null &&
+          accountId.length <= maxAddressLength &&
+          _ref.read(substrateServiceProvider).isValidSS58Address(accountId)) {
         _ref.read(sharedAccountIntentProvider.notifier).state = accountId;
       } else {
-        quantusDebugPrint('Missing or empty account id');
+        quantusPrint('Missing or invalid account id');
       }
     }
 
-    if (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'pay') {
-      final payment = PaymentIntent.tryParseUrl(uri.toString());
-      if (payment != null) {
+    if (parts.path.isNotEmpty && parts.path.first == 'pay') {
+      final payment = PaymentIntent.tryParseUrl(url);
+      // Fail closed: a /pay link with an invalid recipient must not pre-fill
+      // the send flow, same as address entry in the send flow itself.
+      if (payment != null && _ref.read(substrateServiceProvider).isValidSS58Address(payment.to)) {
         _ref.read(paymentIntentProvider.notifier).state = payment;
       } else {
-        quantusDebugPrint('Missing payment parameters');
+        quantusPrint('Missing payment parameters or invalid recipient address');
       }
-    }
-
-    if (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'oauth') {
-      _ref.invalidate(accountAssociationsProvider);
     }
   }
 

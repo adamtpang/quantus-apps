@@ -6,7 +6,9 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `all_required_files_exist`, `vec_to_32`, `vec_to_digest`
+// These functions are ignored because they are not marked as `pub`: `all_required_files_exist`, `cleanup_stale_circuit_dirs`, `vec_to_32`, `vec_to_digest`, `versioned_bins_dir`
+
+String zkCircuitsVersion() => RustLib.instance.api.crateApiWormholeZkCircuitsVersion();
 
 String computeAddressHashHex({required List<int> rawAddress}) =>
     RustLib.instance.api.crateApiWormholeComputeAddressHashHex(rawAddress: rawAddress);
@@ -89,6 +91,8 @@ class ProofInput {
   final Uint8List positions;
   final Uint8List exitAccount1;
   final int outputAmount1;
+  final Uint8List exitAccount2;
+  final int outputAmount2;
   final int volumeFeeBps;
   final int assetId;
 
@@ -108,6 +112,8 @@ class ProofInput {
     required this.positions,
     required this.exitAccount1,
     required this.outputAmount1,
+    required this.exitAccount2,
+    required this.outputAmount2,
     required this.volumeFeeBps,
     required this.assetId,
   });
@@ -129,6 +135,8 @@ class ProofInput {
       positions.hashCode ^
       exitAccount1.hashCode ^
       outputAmount1.hashCode ^
+      exitAccount2.hashCode ^
+      outputAmount2.hashCode ^
       volumeFeeBps.hashCode ^
       assetId.hashCode;
 
@@ -152,6 +160,8 @@ class ProofInput {
           positions == other.positions &&
           exitAccount1 == other.exitAccount1 &&
           outputAmount1 == other.outputAmount1 &&
+          exitAccount2 == other.exitAccount2 &&
+          outputAmount2 == other.outputAmount2 &&
           volumeFeeBps == other.volumeFeeBps &&
           assetId == other.assetId;
 }

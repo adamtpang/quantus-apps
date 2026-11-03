@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:quantus_miner/src/services/binary_manager.dart';
 import 'package:quantus_miner/src/services/miner_settings_service.dart';
 import 'package:quantus_miner/src/services/miner_wallet_service.dart';
 import 'package:quantus_miner/src/utils/app_logger.dart';
@@ -29,7 +26,7 @@ enum _Screen { input, confirm, progress }
 
 class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
   final _addressController = TextEditingController();
-  final _claimService = WormholeClaimService();
+  final _wormholeSendService = WormholeSendService();
   final _walletService = MinerWalletService();
   final _settingsService = MinerSettingsService();
 
@@ -67,8 +64,8 @@ class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
     super.dispose();
   }
 
-  String _formatBalance(BigInt planck) =>
-      _balanceFormatter.formatBalance(planck, smartDecimals: 4, addThousandsSeparators: false);
+  String _formatBalance(BigInt amount) =>
+      _balanceFormatter.formatBalance(amount, smartDecimals: 4, addThousandsSeparators: false);
 
   bool _validateAddress(String address) {
     final trimmed = address.trim();
@@ -117,18 +114,16 @@ class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
       }
 
       final chainConfig = await _settingsService.getChainConfig();
-      final binsDir = '${await BinaryManager.getQuantusHomeDirectoryPath()}/generated-bins';
-      await Directory(binsDir).create(recursive: true);
-
+      final circuitDir = await CircuitManager.getCircuitDirectory();
       final rpcUrl = chainConfig.rpcUrl;
       _log.i('Starting claim for ${keyPair.address} to ${_addressController.text.trim()}');
 
-      final result = await _claimService.claimRewards(
+      final result = await _wormholeSendService.claimRewards(
         wormholeAddress: keyPair.address,
         secretHex: keyPair.secretHex,
         destinationAddress: _addressController.text.trim(),
         rpcUrl: rpcUrl,
-        circuitBinsDir: binsDir,
+        circuitBinsDir: circuitDir,
         onProgress: (progress) {
           if (!mounted) return;
           setState(() {
@@ -140,9 +135,15 @@ class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
 
       if (!mounted) return;
       setState(() {
-        _done = true;
+        _done = !result.cancelled;
+        _cancelledTerminal = result.cancelled;
         _running = false;
-        _resultMessage = '${result.transfersProcessed} transfers claimed in ${result.batchesSubmitted} batch(es)';
+        // On a late cancel the totals reflect only the batches that were
+        // actually submitted before the operation stopped.
+        _resultMessage = result.cancelled
+            ? 'Cancelled: ${result.transfersProcessed} transfers were already claimed in '
+                  '${result.batchesSubmitted} batch(es)'
+            : '${result.transfersProcessed} transfers claimed in ${result.batchesSubmitted} batch(es)';
       });
     } on ClaimCancelled {
       if (!mounted) return;
@@ -162,7 +163,7 @@ class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
   }
 
   void _cancelClaim() {
-    _claimService.cancel();
+    _wormholeSendService.cancel();
   }
 
   @override
@@ -223,7 +224,7 @@ class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
               children: [
                 Text('Claimable Balance', style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.7))),
                 Text(
-                  '${_formatBalance(widget.balance)} QUAN',
+                  '${_formatBalance(widget.balance)} ${AppConstants.tokenSymbol}',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -302,11 +303,11 @@ class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
             ],
           ),
           const SizedBox(height: 24),
-          _confirmRow('Amount', '${_formatBalance(widget.balance)} QUAN'),
+          _confirmRow('Amount', '${_formatBalance(widget.balance)} ${AppConstants.tokenSymbol}'),
           const SizedBox(height: 12),
           _confirmRow('Destination', _addressController.text.trim(), mono: true),
           const SizedBox(height: 12),
-          _confirmRow('Fee', '0.1% volume fee'),
+          _confirmRow('Fee', '${wormholeVolumeFeePercentText()}% volume fee'),
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(12),
@@ -421,15 +422,15 @@ class _ClaimRewardsDialogState extends State<_ClaimRewardsDialog> {
               children: [
                 _buildStepRow(1, 'Preparing circuits'),
                 _buildStepConnector(1),
-                _buildStepRow(2, 'Fetching transfers'),
+                _buildStepRow(2, 'Gathering funds'),
                 _buildStepConnector(2),
-                _buildStepRow(3, 'Computing nullifiers'),
+                _buildStepRow(3, 'Securing transaction'),
                 _buildStepConnector(3),
-                _buildStepRow(4, 'Checking nullifiers'),
+                _buildStepRow(4, 'Generating ZK proofs'),
                 _buildStepConnector(4),
-                _buildStepRow(5, 'Generating ZK proofs'),
+                _buildStepRow(5, 'Aggregating proofs'),
                 _buildStepConnector(5),
-                _buildStepRow(6, 'Aggregating proofs and submitting to chain'),
+                _buildStepRow(6, 'Submitting to chain'),
               ],
             ),
           ),

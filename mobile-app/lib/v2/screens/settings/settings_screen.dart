@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
 import 'package:resonance_network_wallet/generated/version.g.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/mining_rewards_provider.dart';
 import 'package:resonance_network_wallet/shared/constants/e2e_keys.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
+import 'package:resonance_network_wallet/shared/utils/print.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/about_quantus_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/add_account_menu_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/help_and_support_screen.dart';
@@ -16,7 +17,6 @@ import 'package:resonance_network_wallet/v2/screens/settings/settings_divider.da
 import 'package:resonance_network_wallet/v2/screens/settings/settings_tappable_row.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/mining_rewards_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/settings/wallet_settings_screen.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
 
 class SettingsScreenV2 extends ConsumerStatefulWidget {
   const SettingsScreenV2({super.key});
@@ -31,9 +31,8 @@ class _SettingsScreenV2State extends ConsumerState<SettingsScreenV2> {
     final l10n = ref.watch(l10nProvider);
     final miningAsync = ref.watch(miningRewardsProvider);
 
-    final colors = context.colors;
-    final trailing = SettingsTappableRowUtils.chevron(colors);
-    final entries = _settingsHubItems(colors, l10n);
+    final trailing = SettingsTappableRowUtils.chevron();
+    final entries = _settingsHubItems(context, l10n);
 
     return ScaffoldBase(
       key: const Key(E2EKeys.settingsScreen),
@@ -50,8 +49,8 @@ class _SettingsScreenV2State extends ConsumerState<SettingsScreenV2> {
                 ),
                 loading: () => _buildTappableRow(e.value, subtitle: l10n.commonLoading, trailing: trailing),
                 error: (err, st) {
-                  debugPrint('Error getting mining rewards: ${err.toString()}');
-                  debugPrint('Stack trace: ${st.toString()}');
+                  quantusPrint('Error getting mining rewards: ${err.toString()}');
+                  quantusPrint('Stack trace: ${st.toString()}');
 
                   return _buildTappableRow(e.value, subtitle: l10n.settingsMiningRewardsError, trailing: trailing);
                 },
@@ -93,7 +92,8 @@ class _SettingsHubItem {
   final Key? rowKey;
 }
 
-List<_SettingsHubItem> _settingsHubItems(AppColorsV2 colors, AppLocalizations l10n) {
+List<_SettingsHubItem> _settingsHubItems(BuildContext context, AppLocalizations l10n) {
+  final colors = context.colorsV3;
   return [
     _SettingsHubItem(
       leading: _settingsHubIcon(colors, icon: Icons.account_balance_wallet_outlined),
@@ -109,7 +109,15 @@ List<_SettingsHubItem> _settingsHubItems(AppColorsV2 colors, AppLocalizations l1
       page: const PreferencesSettingsScreenV2(),
     ),
     _SettingsHubItem(
-      leading: _settingsHubIcon(colors, svg: SvgPicture.asset('assets/v2/axe.svg', width: 18, height: 18)),
+      leading: _settingsHubIcon(
+        colors,
+        svg: SvgPicture.asset(
+          'assets/v2/axe.svg',
+          width: 18,
+          height: 18,
+          colorFilter: ColorFilter.mode(colors.accentFlare, BlendMode.srcIn),
+        ),
+      ),
       title: l10n.settingsMiningRewards,
       subtitle: l10n.commonLoading,
       page: const MiningRewardsScreen(),
@@ -128,7 +136,15 @@ List<_SettingsHubItem> _settingsHubItems(AppColorsV2 colors, AppLocalizations l1
       page: const HelpAndSupportScreenV2(),
     ),
     _SettingsHubItem(
-      leading: _settingsHubIcon(colors, svg: SvgPicture.asset('assets/v2/uppercase_q.svg', width: 18, height: 18)),
+      leading: _settingsHubIcon(
+        colors,
+        svg: SvgPicture.asset(
+          'assets/v2/uppercase_q.svg',
+          width: 18,
+          height: 18,
+          colorFilter: ColorFilter.mode(colors.accentFlare, BlendMode.srcIn),
+        ),
+      ),
       title: l10n.settingsAboutTitle,
       subtitle: l10n.settingsAboutHubSubtitle(appVersion, appBuildNumber),
       page: const AboutQuantusScreenV2(),
@@ -136,13 +152,13 @@ List<_SettingsHubItem> _settingsHubItems(AppColorsV2 colors, AppLocalizations l1
   ];
 }
 
-/// 40×40 leading slot: [icon] in accent orange, or a custom [svg].
-Widget _settingsHubIcon(AppColorsV2 colors, {IconData? icon, SvgPicture? svg}) {
+/// 40×40 leading slot: [icon] in accent flare, or a custom [svg].
+Widget _settingsHubIcon(AppColorsV3 colors, {IconData? icon, SvgPicture? svg}) {
   const double iconSlot = 40;
   Widget? child;
 
   if (icon != null) {
-    child = Icon(icon, color: colors.accentOrange, size: 22);
+    child = Icon(icon, color: colors.accentFlare, size: 22);
   } else if (svg != null) {
     child = svg;
   }

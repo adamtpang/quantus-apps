@@ -1,9 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:quantus_sdk/src/extensions/dilithium_scheme_extension.dart';
 import 'package:quantus_sdk/src/models/account.dart';
 import 'package:quantus_sdk/src/models/display_account.dart';
 import 'package:quantus_sdk/src/models/multisig_account.dart';
+import 'package:quantus_sdk/src/rust/api/crypto.dart';
+import 'package:quantus_sdk/src/services/hd_wallet_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
@@ -12,18 +15,16 @@ class SettingsService {
   SettingsService._internal();
 
   late SharedPreferences _prefs;
-  final _secureStorage = const FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false));
+  final _secureStorage = const FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+  );
 
   // New keys for multi-account support
   static const String _accountsKey = 'accounts_v5';
   static const String _multisigAccountsKey = 'multisig_accounts_v1';
-  static const String _accountsToMigrateKey = 'accounts_to_migrate';
   static const String _addressBookKey = 'address_book';
 
-  static const String _oldAccountsKeyV4 = 'accounts_v4';
-  static const String _oldAccountsKeyV3 = 'accounts_v3';
-  static const String _oldAccountsKeyV2 = 'accounts_v2';
-  static const String _oldAccountsKeyV1 = 'accounts';
   static const String _activeAccountIndexKey = 'active_account_index';
   static const String _activeAccountIdKey = 'active_account_id';
   static const String _activeDisplayAccountKey = 'active_display_account';
@@ -32,20 +33,35 @@ class SettingsService {
   static const String _selectedFiatCurrencyKey = 'selected_fiat_currency';
   static const String _selectedAppLocaleKey = 'selected_app_locale';
 
-  static const String _lastPausedTimeKey = 'last_paused_time';
-
   // referral status
   static const String hasCheckedReferralKey = 'referral_check';
   static const String referralCodeKey = 'referral_code';
   static const String hasWatchedQuestsPromoKey = 'quests_promo';
   static const String existingUserSeenPromoVideoKey = 'existing_user_seen_promo_video';
 
+  static const _legacyStorage = FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false));
+  static const _migratedKeychainKey = 'keychain_migrated_to_this_device';
+  bool _keychainMigrated = false;
+
   Future<void> initialize() async {
-    // Always (re)bind the SharedPreferences instance. This ensures tests that
-    // call SharedPreferences.setMockInitialValues({}) before initialize()
-    // get a clean, isolated preferences store even if the service singleton
-    // was created earlier in the process.
     _prefs = await SharedPreferences.getInstance();
+    _keychainMigrated = _prefs.getBool(_migratedKeychainKey) == true;
+  }
+
+  Future<void> _ensureKeychainMigrated() async {
+    if (_keychainMigrated) return;
+    _keychainMigrated = true;
+    try {
+      for (int i = 0; i < 10; i++) {
+        final key = getMnemonicKey(i);
+        final value = await _legacyStorage.read(key: key);
+        if (value != null) {
+          await _legacyStorage.delete(key: key);
+          await _secureStorage.write(key: key, value: value);
+        }
+      }
+    } catch (_) {}
+    await _prefs.setBool(_migratedKeychainKey, true);
   }
 
   // --- Multi-Account Methods ---
@@ -54,15 +70,21 @@ class SettingsService {
     final accountsJson = _prefs.getString(_accountsKey);
     if (accountsJson != null) {
       final decoded = jsonDecode(accountsJson) as List<dynamic>;
-      return decoded.map((e) => Account.fromJson(e)).toList()..sort(
-        (a, b) => a.walletIndex != b.walletIndex ? a.walletIndex.compareTo(b.walletIndex) : a.index.compareTo(b.index),
-      );
+      return decoded.map((e) => Account.fromJson(e)).toList()..sort(Account.compare);
     }
     // Migration for existing single-account users
     final oldAccountId = _prefs.getString('account_id');
     if (oldAccountId != null) {
       final oldWalletName = _prefs.getString('wallet_name') ?? 'Account 1';
-      final account = Account(walletIndex: 0, index: 0, name: oldWalletName, accountId: oldAccountId);
+      const legacy = DilithiumSchemeExtension.legacy;
+      final account = Account(
+        walletIndex: 0,
+        index: 0,
+        name: oldWalletName,
+        accountId: oldAccountId,
+        scheme: legacy,
+        derivationPath: HdWalletService.pathForIndex(0, legacy),
+      );
       await saveAccounts([account]);
       await setActiveAccount(RegularAccount(account));
       // Clean up old keys after migration
@@ -79,32 +101,13 @@ class SettingsService {
     await _prefs.setString(_accountsKey, jsonEncode(jsonData));
   }
 
-  // --- Accounts To Migrate (for deferred upload) ---
-  Future<void> setAccountsToMigrate(List<Account> accounts) async {
-    final List<Map<String, dynamic>> jsonData = accounts.map((a) => a.toJson()).toList();
-    await _prefs.setString(_accountsToMigrateKey, jsonEncode(jsonData));
-  }
-
-  List<Account> getAccountsToMigrate() {
-    final jsonStr = _prefs.getString(_accountsToMigrateKey);
-    if (jsonStr == null) return [];
-    try {
-      final decoded = jsonDecode(jsonStr) as List<dynamic>;
-      return decoded.map((e) => Account.fromJson(e)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<void> clearAccountsToMigrate() async {
-    await _prefs.remove(_accountsToMigrateKey);
-  }
-
   Future<void> addAccount(Account account) async {
     final accounts = await getAccounts();
-    // Check for duplicates by index or accountId before adding
+    // Check for duplicates by derivation slot or accountId before adding
     if (!accounts.any(
-      (a) => (a.walletIndex == account.walletIndex && a.index == account.index) || a.accountId == account.accountId,
+      (a) =>
+          (a.walletIndex == account.walletIndex && a.index == account.index && a.scheme == account.scheme) ||
+          a.accountId == account.accountId,
     )) {
       accounts.add(account);
       await saveAccounts(accounts);
@@ -168,6 +171,7 @@ class SettingsService {
     await deleteMnemonic(walletIndex);
     await _prefs.remove(_walletOriginKey(walletIndex));
     await _prefs.remove(_recoveryPhraseViewedKey(walletIndex));
+    await _prefs.remove(_walletNameKey(walletIndex));
   }
 
   Future<void> setActiveAccount(DisplayAccount account) async {
@@ -228,21 +232,28 @@ class SettingsService {
     }
   }
 
-  Future<Account?> getAccount({required int walletIndex, required int index}) async {
+  /// The wallet's first transparent account.
+  Future<Account?> getPrimaryAccount() async {
     final accounts = await getAccounts();
-    final ix = accounts.indexWhere((a) => a.walletIndex == walletIndex && a.index == index);
-    return ix != -1 ? accounts[ix] : null;
+    return accounts.where((a) => a.walletIndex == 0 && a.accountType != AccountType.encrypted).firstOrNull;
   }
 
   /// Returns the lowest non-negative derivation index not currently used by a
-  /// (non-encrypted) account in [walletIndex]. Filling the lowest gap first
-  /// keeps a wallet's accounts contiguous and deterministic: removing then
-  /// re-adding accounts always reproduces the same indices (and therefore the
-  /// same addresses) in the same order.
-  Future<int> getNextFreeAccountIndex(int walletIndex) async {
+  /// (non-encrypted) account of [scheme] in [walletIndex]; a null [scheme]
+  /// considers every non-encrypted account. Filling the lowest gap first keeps
+  /// a wallet's accounts contiguous and deterministic: removing then re-adding
+  /// accounts always reproduces the same indices (and therefore the same
+  /// addresses) in the same order.
+  Future<int> getNextFreeAccountIndex(int walletIndex, {DilithiumScheme? scheme}) async {
     final accounts = await getAccounts();
     final used = accounts
-        .where((a) => a.walletIndex == walletIndex && a.index >= 0 && a.accountType != AccountType.encrypted)
+        .where(
+          (a) =>
+              a.walletIndex == walletIndex &&
+              a.index >= 0 &&
+              a.accountType != AccountType.encrypted &&
+              (scheme == null || a.scheme == scheme),
+        )
         .map((a) => a.index)
         .toSet();
     var index = 0;
@@ -350,10 +361,12 @@ class SettingsService {
 
   // Mnemonic Settings - Using secure storage
   Future<void> setMnemonic(String mnemonic, int walletIndex) async {
+    await _ensureKeychainMigrated();
     await _secureStorage.write(key: getMnemonicKey(walletIndex), value: mnemonic);
   }
 
   Future<String?> getMnemonic(int walletIndex) async {
+    await _ensureKeychainMigrated();
     return await _secureStorage.read(key: getMnemonicKey(walletIndex));
   }
 
@@ -426,17 +439,6 @@ class SettingsService {
     return _prefs.getString(_selectedAppLocaleKey);
   }
 
-  // POS Mode Settings
-  static const String _posModeEnabledKey = 'pos_mode_enabled';
-
-  Future<void> setPosModeEnabled(bool enabled) async {
-    await _prefs.setBool(_posModeEnabledKey, enabled);
-  }
-
-  bool isPosModeEnabled() {
-    return _prefs.getBool(_posModeEnabledKey) ?? false;
-  }
-
   // --- Primitive Accessors for General Use ---
 
   /// Get a boolean value from SharedPreferences
@@ -457,64 +459,6 @@ class SettingsService {
   /// Set a string value from SharedPreferences
   Future<void> setString(String key, String value) async {
     await _prefs.setString(key, value);
-  }
-
-  DateTime? getLastPausedTime() {
-    final String? lastPausedString = _prefs.getString(_lastPausedTimeKey);
-    if (lastPausedString == null) return null;
-
-    final DateTime lastPaused = DateTime.parse(lastPausedString);
-    return lastPaused;
-  }
-
-  void setLastPausedTime(DateTime time) {
-    _prefs.setString(_lastPausedTimeKey, time.toIso8601String());
-  }
-
-  void cleanLastPausedTime() {
-    _prefs.remove(_lastPausedTimeKey);
-  }
-
-  // --- Migration Methods ---
-
-  /// Check if old accounts exist in legacy storage
-  bool hasOldAccounts() {
-    final oldAccounts = getOldAccounts();
-    return oldAccounts.isNotEmpty;
-  }
-
-  /// Get old accounts from legacy storage or v2 storage
-  List<Account> getOldAccounts() {
-    final oldAccountsJson =
-        _prefs.getString(_oldAccountsKeyV1) ??
-        _prefs.getString(_oldAccountsKeyV2) ??
-        _prefs.getString(_oldAccountsKeyV3) ??
-        _prefs.getString(_oldAccountsKeyV4);
-    if (oldAccountsJson != null) {
-      try {
-        final decoded = jsonDecode(oldAccountsJson) as List<dynamic>;
-        return decoded.map((e) => Account.fromJson(e)).toList();
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  }
-
-  /// Remove old accounts from legacy storage after successful migration
-  Future<void> clearOldAccounts() async {
-    await _prefs.remove(_oldAccountsKeyV1);
-    await _prefs.remove(_oldAccountsKeyV2);
-    await _prefs.remove(_oldAccountsKeyV3);
-    await _prefs.remove(_oldAccountsKeyV4);
-  }
-
-  /// Set old accounts data (for debugging/testing)
-  Future<void> setOldAccountsData(String jsonData) async {
-    print('removing accounts data');
-    await _prefs.remove(_accountsKey);
-    print('setting old accounts data - reload app after this');
-    await _prefs.setString(_oldAccountsKeyV4, jsonData);
   }
 
   // Test-only helper to reset initialization between tests
@@ -582,6 +526,21 @@ class SettingsService {
 
   void setWalletOrigin(int walletIndex, WalletOrigin origin) {
     _prefs.setString(_walletOriginKey(walletIndex), origin.name);
+  }
+
+  // Note: the bare legacy key 'wallet_name' (no index suffix) is a pre-v5
+  // account name consumed by the migration in [getAccounts]; index 0 must stay
+  // suffixed so the two never collide.
+  String _walletNameKey(int walletIndex) => 'wallet_name_$walletIndex';
+
+  String? getWalletName(int walletIndex) => _prefs.getString(_walletNameKey(walletIndex));
+
+  Future<void> setWalletName(int walletIndex, String? name) async {
+    if (name == null || name.isEmpty) {
+      await _prefs.remove(_walletNameKey(walletIndex));
+    } else {
+      await _prefs.setString(_walletNameKey(walletIndex), name);
+    }
   }
 
   bool existingUserSeenPromoVideo() {

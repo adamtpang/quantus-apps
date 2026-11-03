@@ -11,11 +11,45 @@ import 'package:resonance_network_wallet/providers/multisig_providers.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/services/local_auth_service.dart';
 import 'package:resonance_network_wallet/services/transaction_submission_service.dart';
-import 'package:resonance_network_wallet/v2/components/detail_summary_row.dart';
+import 'package:resonance_network_wallet/shared/utils/print.dart';
 import 'package:resonance_network_wallet/v2/components/multisig_expiry_value.dart';
 import 'package:resonance_network_wallet/v2/screens/send/send_strategy.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
+
+/// Proposal cost for a recipient. The network fee is still a chain estimate,
+/// so it is keyed by recipient only and sized with a representative amount —
+/// the amount moves the encoded length by a few bytes at most — rather than
+/// re-fetched on every keystroke.
+final multisigProposeFeeProvider = FutureProvider.autoDispose.family<SendFee, (MultisigAccount msig, String recipient)>(
+  (ref, key) async {
+    final (msig, recipient) = key;
+    final service = ref.read(multisigServiceProvider);
+    final signer = ref.read(accountsProvider).value?.where((a) => a.accountId == msig.myMemberAccountId).firstOrNull;
+    try {
+      if (signer != null) {
+        return ProposeFee(
+          await service.estimateProposeFeeBreakdown(
+            msig: msig,
+            signer: signer,
+            recipient: recipient,
+            amount: MultisigProposeStrategy._estimateFeeAmount,
+          ),
+        );
+      }
+      final currentBlock = await service.currentBlockNumber();
+      return ProposeFee(
+        ProposeFeeBreakdown(
+          networkFee: BigInt.zero,
+          deposit: service.proposalDeposit,
+          creationFee: service.proposalCreationFee(msig.signers.length),
+          expiryBlock: currentBlock + service.blocksForDuration(MultisigService.defaultProposalExpiry),
+        ),
+      );
+    } catch (e, st) {
+      quantusPrint('Propose fee estimate failed: $e\n$st');
+      rethrow;
+    }
+  },
+);
 
 /// Proposes a transfer from a multisig account. The multisig is a view-only
 /// account, so funds leave from [msig] while the proposing member pays the fee.
@@ -46,7 +80,7 @@ class MultisigProposeStrategy extends SendStrategy {
 
   @override
   bool extraBalancesLoading(WidgetRef ref) =>
-      ref.watch(effectiveBalanceProviderFamily(msig.myMemberAccountId)).isLoading;
+      !ref.watch(effectiveBalanceProviderFamily(msig.myMemberAccountId)).hasValue;
 
   // The proposal fee is paid by the member, not from the multisig balance.
   @override
@@ -60,41 +94,12 @@ class MultisigProposeStrategy extends SendStrategy {
   String? feePayerBalanceLabel(AppLocalizations l10n) => l10n.multisigProposeFeePayerBalanceLabel;
 
   @override
-  Future<SendFee> estimateFee(WidgetRef ref, {required String recipient, required BigInt amount}) async {
-    final service = ref.read(multisigServiceProvider);
-    final useReal = amount > BigInt.zero && ref.read(substrateServiceProvider).isValidSS58Address(recipient);
-    final feeAmount = useReal ? amount : _estimateFeeAmount;
+  ProviderListenable<AsyncValue<SendFee>> feeProvider({required String recipient, required BigInt amount}) =>
+      multisigProposeFeeProvider((msig, recipient.trim()));
 
-    final accounts = ref.read(accountsProvider).value;
-    Account? signer;
-    if (accounts != null) {
-      for (final account in accounts) {
-        if (account.accountId == msig.myMemberAccountId) {
-          signer = account;
-          break;
-        }
-      }
-    }
-
-    final ProposeFeeBreakdown breakdown;
-    if (signer != null) {
-      breakdown = await service.estimateProposeFeeBreakdown(
-        msig: msig,
-        signer: signer,
-        recipient: recipient.trim(),
-        amount: feeAmount,
-      );
-    } else {
-      final currentBlock = await service.currentBlockNumber();
-      breakdown = ProposeFeeBreakdown(
-        networkFee: BigInt.zero,
-        deposit: service.proposalDeposit,
-        creationFee: service.proposalCreationFee(msig.signers.length),
-        expiryBlock: currentBlock + service.blocksForDuration(MultisigService.defaultProposalExpiry),
-      );
-    }
-    return ProposeFee(breakdown);
-  }
+  @override
+  void retryFee(WidgetRef ref, {required String recipient, required BigInt amount}) =>
+      ref.invalidate(multisigProposeFeeProvider((msig, recipient.trim())));
 
   @override
   String? affordabilityError(WidgetRef ref, SendFee fee, AppLocalizations l10n) {
@@ -116,7 +121,6 @@ class MultisigProposeStrategy extends SendStrategy {
     final multisigService = ref.watch(multisigServiceProvider);
     final currentBlock = ref.watch(multisigCurrentBlockProvider).value;
     final breakdown = (fee as ProposeFee).breakdown;
-    final valueStyle = context.themeText.transactionDetailRowLabel;
     final proposerChecksum = ref.watch(checksumNameProvider(msig.myMemberAccountId)).value ?? '';
 
     String amt(BigInt v) =>
@@ -126,17 +130,15 @@ class MultisigProposeStrategy extends SendStrategy {
       const SizedBox(height: 4),
       DetailSummaryRow.review(
         label: l10n.multisigProposeProposerLabel,
-        valueWidget: _ProposerValue(address: msig.myMemberAccountId, checkphrase: proposerChecksum, style: valueStyle),
+        valueWidget: _ProposerValue(address: msig.myMemberAccountId, checkphrase: proposerChecksum),
         valueFlex: 4,
-        valueStyle: valueStyle,
       ),
       const SizedBox(height: 4),
-      DetailSummaryRow.review(label: l10n.sendReviewAmount, value: amt(amount), valueStyle: valueStyle),
+      DetailSummaryRow.review(label: l10n.sendReviewAmount, value: amt(amount)),
       const SizedBox(height: 4),
       DetailSummaryRow.review(
         label: l10n.multisigProposeThresholdLabel,
         value: '${msig.threshold}/${msig.signers.length}',
-        valueStyle: valueStyle,
       ),
       const SizedBox(height: 4),
       DetailSummaryRow.review(
@@ -148,35 +150,17 @@ class MultisigProposeStrategy extends SendStrategy {
             multisigService: multisigService,
             currentBlock: currentBlock,
           ),
-          style: valueStyle,
         ),
         valueFlex: 4,
-        valueStyle: valueStyle,
       ),
       const SizedBox(height: 4),
-      DetailSummaryRow.review(
-        label: l10n.sendReviewNetworkFee,
-        value: amt(breakdown.networkFee),
-        valueStyle: valueStyle,
-      ),
+      DetailSummaryRow.review(label: l10n.sendReviewNetworkFee, value: amt(breakdown.networkFee)),
       const SizedBox(height: 4),
-      DetailSummaryRow.review(
-        label: l10n.multisigProposalDepositLabel,
-        value: amt(breakdown.deposit),
-        valueStyle: valueStyle,
-      ),
+      DetailSummaryRow.review(label: l10n.multisigProposalDepositLabel, value: amt(breakdown.deposit)),
       const SizedBox(height: 4),
-      DetailSummaryRow.review(
-        label: l10n.multisigProposeFeeRowLabel,
-        value: amt(breakdown.creationFee),
-        valueStyle: valueStyle,
-      ),
+      DetailSummaryRow.review(label: l10n.multisigProposeFeeRowLabel, value: amt(breakdown.creationFee)),
       const SizedBox(height: 4),
-      DetailSummaryRow.review(
-        label: l10n.multisigProposeMemberTotalLabel,
-        value: amt(breakdown.memberCost),
-        valueStyle: valueStyle,
-      ),
+      DetailSummaryRow.review(label: l10n.multisigProposeMemberTotalLabel, value: amt(breakdown.memberCost)),
       const SizedBox(height: 4),
     ];
   }
@@ -221,7 +205,7 @@ class MultisigProposeStrategy extends SendStrategy {
       unawaited(
         RecentAddressesService()
             .addAddress(recipientAddress.trim())
-            .catchError((Object e) => debugPrint('Failed to save recent address: $e')),
+            .catchError((Object e) => quantusPrint('Failed to save recent address: $e')),
       );
 
       ref.invalidate(multisigOpenProposalsProvider(msig));
@@ -232,7 +216,7 @@ class MultisigProposeStrategy extends SendStrategy {
         _terminal(l10n, fmt, recipient: recipientAddress, checksum: recipientChecksum, amount: amount),
       );
     } catch (e, st) {
-      debugPrint('Propose submit error: $e $st');
+      quantusPrint('Propose submit error: $e $st');
       return SendFailed(l10n.multisigProposeSubmitFailed);
     }
   }
@@ -258,15 +242,15 @@ class MultisigProposeStrategy extends SendStrategy {
 }
 
 class _ProposerValue extends StatelessWidget {
-  const _ProposerValue({required this.address, required this.checkphrase, required this.style});
+  const _ProposerValue({required this.address, required this.checkphrase});
 
   final String address;
   final String checkphrase;
-  final TextStyle? style;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
@@ -274,11 +258,16 @@ class _ProposerValue extends StatelessWidget {
         if (checkphrase.isNotEmpty)
           Text(
             checkphrase,
-            style: style?.copyWith(color: colors.checksum),
+            style: text.caption.copyWith(color: colors.semanticLilac),
             textAlign: TextAlign.right,
           ),
         const SizedBox(height: 2),
-        Text(address, style: style, textAlign: TextAlign.right, softWrap: true),
+        Text(
+          address,
+          style: text.body.copyWith(color: colors.textContent),
+          textAlign: TextAlign.right,
+          softWrap: true,
+        ),
       ],
     );
   }

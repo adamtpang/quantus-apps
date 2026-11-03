@@ -1,53 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_cold_wallet/components/scaffold_base.dart';
-import 'package:quantus_cold_wallet/components/v2_app_bar.dart';
+import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:quantus_cold_wallet/providers/connectivity_provider.dart';
+import 'package:quantus_cold_wallet/providers/settings_providers.dart';
 import 'package:quantus_cold_wallet/providers/wallet_providers.dart';
+import 'package:quantus_cold_wallet/screens/accounts_screen.dart';
 import 'package:quantus_cold_wallet/screens/scan_transaction_screen.dart';
-import 'package:quantus_cold_wallet/screens/show_key_screen.dart';
-import 'package:quantus_cold_wallet/theme/app_colors.dart';
-import 'package:quantus_cold_wallet/theme/app_text_styles.dart';
+import 'package:quantus_cold_wallet/screens/settings_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
-    final colors = context.colors;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: colors.sheetBackground,
-        title: const Text('Reset wallet?'),
-        content: const Text(
-          'This erases the encrypted key from this device. You can only restore it with your recovery phrase.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Reset', style: TextStyle(color: colors.error)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await ref.read(walletControllerProvider.notifier).wipe();
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
 
     return ScaffoldBase(
       appBar: V2AppBar(
         title: 'Quantus Cold Wallet',
         leading: GestureDetector(
           onTap: () => ref.read(walletControllerProvider.notifier).lock(),
-          child: Icon(Icons.lock_outline, color: colors.textPrimary, size: 22),
+          child: Icon(Icons.lock_outline, color: colors.textContent, size: 22),
         ),
         trailing: GestureDetector(
-          onTap: () => _confirmReset(context, ref),
-          child: Icon(Icons.more_horiz, color: colors.textPrimary, size: 22),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          child: Icon(Icons.settings_outlined, color: colors.textContent, size: 22),
         ),
       ),
       mainContent: Column(
@@ -56,7 +34,7 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             'Choose an action. This signer stays offline at all times.',
-            style: text.smallParagraph?.copyWith(color: colors.textSecondary),
+            style: text.body.copyWith(color: colors.textMuted),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
@@ -65,7 +43,7 @@ class HomeScreen extends ConsumerWidget {
             icon: Icons.qr_code_2_rounded,
             title: 'Show Key',
             subtitle: 'Display your public address for a hot wallet to scan.',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShowKeyScreen())),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen())),
           ),
           const SizedBox(height: 16),
           _actionCard(
@@ -77,6 +55,18 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
+      bottomContent:
+          !(ref.watch(coldSettingsProvider.select((s) => s.wifiOverrideEnabled)) && ref.watch(isOnlineProvider))
+          ? null
+          : ScaffoldBaseBottomContent(
+              child: QuantusButton.simple(
+                label: 'Online — tap to re-lock',
+                icon: Icon(Icons.wifi_rounded, size: 18, color: colors.textContent),
+                iconPlacement: IconPlacement.leading,
+                variant: ButtonVariant.danger,
+                onTap: () => ref.read(coldSettingsProvider.notifier).setWifiOverrideEnabled(false),
+              ),
+            ),
     );
   }
 
@@ -87,33 +77,33 @@ class HomeScreen extends ConsumerWidget {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: colors.surfaceDeep,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colors.borderButton, width: 1),
+          color: colors.bgSurface,
+          borderRadius: context.radiusV3.mdBorder,
+          border: Border.all(color: colors.borderHairline, width: 1),
         ),
         child: Row(
           children: [
             Container(
               width: 52,
               height: 52,
-              decoration: BoxDecoration(color: colors.surface, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: colors.accentOrange, size: 28),
+              decoration: BoxDecoration(color: colors.bgSurface2, borderRadius: context.radiusV3.smBorder),
+              child: Icon(icon, color: colors.accentFlare, size: 28),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: text.smallTitle?.copyWith(color: colors.textPrimary)),
+                  Text(title, style: text.headingRow.copyWith(color: colors.textContent)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: text.detail?.copyWith(color: colors.textSecondary)),
+                  Text(subtitle, style: text.caption.copyWith(color: colors.textMuted)),
                 ],
               ),
             ),

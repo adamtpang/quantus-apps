@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/features/components/dotted_border.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide DecodedCallView;
+import 'package:resonance_network_wallet/v2/components/dotted_border.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/account_providers.dart';
 import 'package:resonance_network_wallet/providers/currency_display_provider.dart';
@@ -11,22 +11,17 @@ import 'package:resonance_network_wallet/providers/pending_multisig_approvals_pr
 import 'package:resonance_network_wallet/providers/pending_multisig_cancellations_provider.dart';
 import 'package:resonance_network_wallet/providers/pending_multisig_executions_provider.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
-import 'package:resonance_network_wallet/v2/components/multisig_expiry_value.dart';
 import 'package:resonance_network_wallet/routes.dart';
 import 'package:resonance_network_wallet/shared/extensions/current_route_extensions.dart';
 import 'package:resonance_network_wallet/shared/utils/multisig_local_signers.dart';
 import 'package:resonance_network_wallet/v2/components/amount_display_with_conversion.dart';
-import 'package:resonance_network_wallet/v2/components/bottom_sheet_container.dart';
-import 'package:resonance_network_wallet/v2/components/detail_summary_row.dart';
+import 'package:resonance_network_wallet/v2/components/decoded_call_view.dart';
 import 'package:resonance_network_wallet/v2/components/explorer_link.dart';
-import 'package:resonance_network_wallet/v2/components/loader.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
+import 'package:resonance_network_wallet/v2/components/multisig_expiry_value.dart';
 import 'package:resonance_network_wallet/v2/screens/multisig/multisig_approve_confirm_sheet.dart';
 import 'package:resonance_network_wallet/v2/screens/multisig/multisig_cancel_confirm_sheet.dart';
 import 'package:resonance_network_wallet/v2/screens/multisig/multisig_execute_confirm_sheet.dart';
 import 'package:resonance_network_wallet/v2/screens/multisig/multisig_signer_picker_sheet.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 /// Shows proposal detail with approve or execute actions for eligible signers.
 void showMultisigProposalDetailSheet(
@@ -107,7 +102,7 @@ class _MultisigProposalDetailSheetById extends ConsumerWidget {
         child: Text(
           text,
           textAlign: TextAlign.center,
-          style: context.themeText.smallParagraph?.copyWith(color: context.colors.textTertiary),
+          style: context.themeTextV3.body.copyWith(color: context.colorsV3.textMuted),
         ),
       ),
     );
@@ -153,8 +148,7 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
     final fmt = ref.watch(numberFormattingServiceProvider);
     final currentBlock = ref.watch(multisigCurrentBlockProvider).value;
     final multisigService = ref.watch(multisigServiceProvider);
@@ -201,24 +195,23 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 16),
           _AmountSection(proposal: liveProposal),
           const SizedBox(height: 20),
           DetailSummaryRow(
             label: l10n.multisigProposalStatusLabel,
-            valueWidget: _statusChip(l10n, colors, text, currentBlock, liveProposal),
+            valueWidget: _statusChip(l10n, currentBlock, liveProposal),
           ),
           const SizedBox(height: 8),
           DottedBorder(
             dashLength: 3,
             gapLength: 8,
-            color: colors.borderButton.useOpacity(0.5),
+            color: colors.borderHairline,
             child: const SizedBox(width: double.infinity, height: 1),
           ),
           const SizedBox(height: 8),
-          _summary(l10n, colors, text, fmt, multisigService, currentBlock, liveProposal),
+          _summary(l10n, fmt, multisigService, currentBlock, liveProposal),
           const SizedBox(height: 24),
-          _signers(l10n, colors, text, liveProposal, localSignerIds),
+          _signers(context, l10n, liveProposal, localSignerIds),
           const SizedBox(height: 24),
           _actionButtons(
             context,
@@ -234,9 +227,8 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _actionNote(
+            context,
             l10n,
-            colors,
-            text,
             liveProposal: liveProposal,
             allLocalApproved: allLocalApproved,
             eligibleApprovers: eligibleApprovers,
@@ -249,7 +241,6 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
           Center(
             child: ExplorerLink(
               url: '${AppConstants.explorerEndpoint}/multisig-proposals/${liveProposal.explorerProposalId}',
-              color: colors.accentOrange,
             ),
           ),
           const SizedBox(height: 8),
@@ -267,8 +258,6 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
 
   Widget _summary(
     AppLocalizations l10n,
-    AppColorsV2 colors,
-    AppTextTheme text,
     NumberFormattingService fmt,
     MultisigService multisigService,
     int? currentBlock,
@@ -283,9 +272,19 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
     );
     final isTerminal = liveProposal.isTerminal;
 
+    // A proposal is not necessarily a transfer, so show its decoded call when the
+    // indexer gave us the bytes and fall back to the recipient row otherwise.
+    final decoded = liveProposal.decodedCall;
+
     return Column(
       children: [
-        DetailSummaryRow(label: l10n.activityDetailTo, value: recipient),
+        if (!liveProposal.hasUndecodableCall && decoded != null && decoded.summary == null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: DecodedCallView(call: decoded),
+          )
+        else if (!liveProposal.hasUndecodableCall)
+          DetailSummaryRow(label: l10n.activityDetailTo, value: recipient),
         if (isTerminal)
           DetailSummaryRow(
             label: l10n.multisigProposalAtLabel,
@@ -294,10 +293,7 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
         else
           DetailSummaryRow(
             label: l10n.multisigProposalExpiresLabel,
-            valueWidget: MultisigExpiryValue(
-              parts: expiryParts,
-              style: text.transactionDetailRowValue?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
-            ),
+            valueWidget: MultisigExpiryValue(parts: expiryParts),
             valueFlex: 4,
           ),
         DetailSummaryRow(
@@ -330,19 +326,21 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
   }
 
   Widget _signers(
+    BuildContext context,
     AppLocalizations l10n,
-    AppColorsV2 colors,
-    AppTextTheme text,
     MultisigProposal liveProposal,
     Set<String> localSignerIds,
   ) {
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: colors.surfaceDeep, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.multisigProposalSignersLabel, style: text.receiveLabel?.copyWith(color: colors.textLabel)),
+          Text(l10n.multisigProposalSignersLabel, style: text.labelData.copyWith(color: colors.textMuted)),
           const SizedBox(height: 12),
           ...msig.signers.map((s) {
             final approved = liveProposal.approvals.contains(s);
@@ -354,37 +352,18 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
                   Icon(
                     approved ? Icons.check_circle : Icons.radio_button_unchecked,
                     size: 18,
-                    color: approved ? colors.success : colors.textMuted,
+                    color: approved ? colors.semanticSage : colors.textMuted,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       AddressFormattingService.formatAddress(s),
-                      style: text.smallParagraph?.copyWith(
-                        color: colors.textPrimary,
-                        fontFamily: AppTextTheme.fontFamilySecondary,
-                      ),
+                      style: text.dataAddress.copyWith(color: colors.textContent),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (isYou)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colors.accentOrange.useOpacity(0.18),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        l10n.multisigYouLabel,
-                        style: text.detail?.copyWith(
-                          color: colors.accentOrange,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
+                  if (isYou) QuantusBadge(label: l10n.multisigYouLabel),
                 ],
               ),
             );
@@ -406,10 +385,12 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
     required bool hasLocalSigner,
     required bool isActionable,
   }) {
-    if (liveProposal.isTerminal || (allLocalApproved && !liveProposal.isReadyToExecute)) {
+    if (liveProposal.hasUndecodableCall ||
+        liveProposal.isTerminal ||
+        (allLocalApproved && !liveProposal.isReadyToExecute)) {
       return QuantusButton.simple(
         label: l10n.multisigDone,
-        variant: ButtonVariant.secondary,
+        variant: ButtonVariant.staged,
         onTap: () => Navigator.of(context).pop(),
       );
     }
@@ -561,9 +542,8 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
   }
 
   Widget _actionNote(
-    AppLocalizations l10n,
-    AppColorsV2 colors,
-    AppTextTheme text, {
+    BuildContext context,
+    AppLocalizations l10n, {
     required MultisigProposal liveProposal,
     required bool allLocalApproved,
     required List<Account> eligibleApprovers,
@@ -592,7 +572,7 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
       child: Text(
         note,
         textAlign: TextAlign.center,
-        style: text.detail?.copyWith(color: colors.textTertiary),
+        style: context.themeTextV3.caption.copyWith(color: context.colorsV3.textMuted),
       ),
     );
   }
@@ -608,6 +588,9 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
     required bool hasLocalSigner,
     required bool isActionable,
   }) {
+    if (liveProposal.hasUndecodableCall) {
+      return '';
+    }
     if (liveProposal.status == MultisigProposalStatus.cancelled) {
       return l10n.multisigProposalAlreadyCancelledNote;
     }
@@ -636,32 +619,19 @@ class _MultisigProposalDetailSheet extends ConsumerWidget {
     };
   }
 
-  Widget _statusChip(
-    AppLocalizations l10n,
-    AppColorsV2 colors,
-    AppTextTheme text,
-    int? currentBlock,
-    MultisigProposal liveProposal,
-  ) {
+  Widget _statusChip(AppLocalizations l10n, int? currentBlock, MultisigProposal liveProposal) {
     final isExpired = currentBlock != null && liveProposal.expired(currentBlock);
-    final (label, color) = switch (liveProposal.status) {
+    final (label, tone) = switch (liveProposal.status) {
       MultisigProposalStatus.active =>
-        isExpired ? (l10n.multisigStatusExpired, colors.textTertiary) : (l10n.multisigStatusActive, colors.checksum),
+        isExpired ? (l10n.multisigStatusExpired, BadgeTone.sand) : (l10n.multisigStatusActive, BadgeTone.glacier),
       MultisigProposalStatus.approved =>
-        isExpired ? (l10n.multisigStatusExpired, colors.textTertiary) : (l10n.multisigStatusApproved, colors.checksum),
-      MultisigProposalStatus.executed => (l10n.multisigStatusExecuted, colors.success),
-      MultisigProposalStatus.cancelled => (l10n.multisigStatusCancelled, colors.textError),
-      MultisigProposalStatus.removed => (l10n.multisigStatusRemoved, colors.textError),
-      MultisigProposalStatus.unknown => (l10n.multisigStatusUnknown, colors.textTertiary),
+        isExpired ? (l10n.multisigStatusExpired, BadgeTone.sand) : (l10n.multisigStatusApproved, BadgeTone.glacier),
+      MultisigProposalStatus.executed => (l10n.multisigStatusExecuted, BadgeTone.sage),
+      MultisigProposalStatus.cancelled => (l10n.multisigStatusCancelled, BadgeTone.ember),
+      MultisigProposalStatus.removed => (l10n.multisigStatusRemoved, BadgeTone.ember),
+      MultisigProposalStatus.unknown => (l10n.multisigStatusUnknown, BadgeTone.neutral),
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.useOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-      child: Text(
-        label,
-        style: text.detail?.copyWith(color: color, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.8),
-      ),
-    );
+    return QuantusBadge(label: label, tone: tone);
   }
 }
 
@@ -672,7 +642,28 @@ class _AmountSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final amount = ref.watch(txAmountDisplayProvider)(proposal.amount, isSend: true, withQuanSymbol: false);
+    if (proposal.hasUndecodableCall) {
+      return Text(
+        ref.watch(l10nProvider).multisigProposalInvalid,
+        textAlign: TextAlign.center,
+        style: context.themeTextV3.titleScreen.copyWith(color: context.colorsV3.semanticEmber),
+      );
+    }
+
+    // Only a value-moving proposal has an amount hero; a governance vote or a
+    // runtime-upgrade authorisation is named instead of shown as zero.
+    final decoded = proposal.decodedCall;
+    if (decoded != null && decoded.summary == null) {
+      final text = context.themeTextV3;
+      final colors = context.colorsV3;
+      return Text(
+        decoded.displayTitle,
+        textAlign: TextAlign.center,
+        style: text.titleScreen.copyWith(color: colors.textContent),
+      );
+    }
+
+    final amount = ref.watch(txAmountDisplayProvider)(proposal.amount, isSend: true, withTokenSymbol: false);
 
     return AmountDisplayWithConversion(amountDisplay: amount);
   }

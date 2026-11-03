@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/features/components/skeleton.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/multisig_providers.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
-import 'package:resonance_network_wallet/shared/extensions/toaster_extensions.dart';
 import 'package:resonance_network_wallet/shared/utils/print.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class DiscoverMultisigScreen extends ConsumerStatefulWidget {
   const DiscoverMultisigScreen({super.key});
@@ -58,8 +52,8 @@ class _DiscoverMultisigScreenState extends ConsumerState<DiscoverMultisigScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final discoveredAsync = ref.watch(discoveredMultisigsProvider);
     final savedIds = (ref.watch(multisigAccountsProvider).value ?? []).map((a) => a.accountId).toSet();
 
@@ -82,8 +76,6 @@ class _DiscoverMultisigScreenState extends ConsumerState<DiscoverMultisigScreen>
           message: l10n.multisigAddDiscoverFailed(error.toString()),
           retryLabel: l10n.homeActivityRetry,
           onRetry: () => ref.invalidate(discoveredMultisigsProvider),
-          colors: colors,
-          text: text,
         ),
         data: (discovered) {
           final sorted = _sortedDiscovered(discovered, savedIds);
@@ -91,7 +83,7 @@ class _DiscoverMultisigScreenState extends ConsumerState<DiscoverMultisigScreen>
             return Center(
               child: Text(
                 l10n.multisigAddNoneFound,
-                style: text.smallParagraph?.copyWith(color: colors.textSecondary),
+                style: text.body.copyWith(color: colors.textMuted),
                 textAlign: TextAlign.center,
               ),
             );
@@ -100,9 +92,9 @@ class _DiscoverMultisigScreenState extends ConsumerState<DiscoverMultisigScreen>
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(l10n.multisigAddDiscoveredTitle, style: text.receiveLabel?.copyWith(color: colors.textLabel)),
+              Text(l10n.multisigAddDiscoveredTitle, style: text.labelData.copyWith(color: colors.textMuted)),
               const SizedBox(height: 8),
-              Text(l10n.multisigAddDiscoveredSubtitle, style: text.detail?.copyWith(color: colors.textTertiary)),
+              Text(l10n.multisigAddDiscoveredSubtitle, style: text.caption.copyWith(color: colors.textMuted)),
               const SizedBox(height: 24),
               ListView.separated(
                 shrinkWrap: true,
@@ -122,8 +114,6 @@ class _DiscoverMultisigScreenState extends ConsumerState<DiscoverMultisigScreen>
                     addLabel: l10n.multisigAddButton,
                     addedLabel: l10n.multisigAddedButton,
                     thresholdLabel: l10n.multisigThresholdOf(account.threshold, account.signers.length),
-                    colors: colors,
-                    text: text,
                     onAdd: () => _addMultisig(account),
                   );
                 },
@@ -137,28 +127,23 @@ class _DiscoverMultisigScreenState extends ConsumerState<DiscoverMultisigScreen>
 }
 
 class _DiscoverError extends StatelessWidget {
-  const _DiscoverError({
-    required this.message,
-    required this.retryLabel,
-    required this.onRetry,
-    required this.colors,
-    required this.text,
-  });
+  const _DiscoverError({required this.message, required this.retryLabel, required this.onRetry});
 
   final String message;
   final String retryLabel;
   final VoidCallback onRetry;
-  final AppColorsV2 colors;
-  final AppTextTheme text;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(message, style: text.detail?.copyWith(color: colors.textError)),
+        Text(message, style: text.caption.copyWith(color: colors.semanticEmber)),
         const SizedBox(height: 16),
-        QuantusButton.simple(label: retryLabel, variant: ButtonVariant.secondary, onTap: onRetry),
+        QuantusButton.simple(label: retryLabel, variant: ButtonVariant.staged, onTap: onRetry),
       ],
     );
   }
@@ -173,8 +158,6 @@ class _DiscoverMultisigRow extends ConsumerStatefulWidget {
     required this.addLabel,
     required this.addedLabel,
     required this.thresholdLabel,
-    required this.colors,
-    required this.text,
     required this.onAdd,
   });
 
@@ -184,8 +167,6 @@ class _DiscoverMultisigRow extends ConsumerStatefulWidget {
   final String addLabel;
   final String addedLabel;
   final String thresholdLabel;
-  final AppColorsV2 colors;
-  final AppTextTheme text;
   final VoidCallback onAdd;
 
   @override
@@ -206,7 +187,7 @@ class _DiscoverMultisigRowState extends ConsumerState<_DiscoverMultisigRow> {
           if (mounted) setState(() => _checksum = name);
         })
         .catchError((Object e) {
-          quantusDebugPrint('DiscoverMultisigRow: checksum lookup error: $e');
+          quantusPrint('DiscoverMultisigRow: checksum lookup error: $e');
           if (mounted) setState(() => _checksum = 'Error getting checksum');
         });
   }
@@ -214,11 +195,13 @@ class _DiscoverMultisigRowState extends ConsumerState<_DiscoverMultisigRow> {
   @override
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final address = AddressFormattingService.formatAddress(widget.account.accountId);
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: widget.colors.surfaceDeep, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -228,25 +211,19 @@ class _DiscoverMultisigRowState extends ConsumerState<_DiscoverMultisigRow> {
               children: [
                 Text(
                   _checksum ?? l10n.commonLoading,
-                  style: widget.text.detail?.copyWith(color: context.colors.checksum),
+                  style: text.body.copyWith(color: _checksum == null ? colors.textMuted : colors.semanticLilac),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  address,
-                  style: widget.text.smallParagraph?.copyWith(
-                    color: widget.colors.textPrimary,
-                    fontFamily: AppTextTheme.fontFamilySecondary,
-                  ),
-                ),
+                Text(address, style: text.dataAddress.copyWith(color: colors.textContent)),
                 const SizedBox(height: 4),
-                Text(widget.thresholdLabel, style: widget.text.detail?.copyWith(color: widget.colors.textTertiary)),
+                Text(widget.thresholdLabel, style: text.caption.copyWith(color: colors.textMuted)),
               ],
             ),
           ),
           const SizedBox(width: 12),
           QuantusButton.simple(
             label: widget.isAdded ? widget.addedLabel : widget.addLabel,
-            variant: widget.isAdded ? ButtonVariant.secondary : ButtonVariant.primary,
+            variant: widget.isAdded ? ButtonVariant.staged : ButtonVariant.primary,
             isDisabled: widget.isAdded,
             isLoading: widget.isAdding,
             onTap: widget.isAdded ? null : widget.onAdd,

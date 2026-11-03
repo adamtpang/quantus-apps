@@ -42,7 +42,6 @@ class _AppLifecycleManagerState extends ConsumerState<AppLifecycleManager> with 
       ref.read(appLifecycleStateProvider.notifier).state =
           WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
 
-      _initializeTaskmasterLogin();
       _setupConnectivityListener();
       localAuthNotifier.checkAuthentication();
     });
@@ -56,17 +55,17 @@ class _AppLifecycleManagerState extends ConsumerState<AppLifecycleManager> with 
           final appState = ref.read(appLifecycleStateProvider);
 
           if (status == NetworkStatus.online && appState == AppLifecycleState.resumed) {
-            quantusDebugPrint('Back online - resuming polling');
+            quantusPrint('Back online - resuming polling');
             pollingManager.resumePolling();
             pollingManager.triggerSilentRefresh();
           } else if (status == NetworkStatus.offline) {
-            quantusDebugPrint('Gone offline - pausing polling');
+            quantusPrint('Gone offline - pausing polling');
             pollingManager.pausePolling();
           }
         },
         loading: () {},
         error: (e, _) {
-          quantusDebugPrint('Error listening to network status: $e');
+          quantusPrint('Error listening to network status: $e');
         },
       );
     });
@@ -88,7 +87,7 @@ class _AppLifecycleManagerState extends ConsumerState<AppLifecycleManager> with 
     if (state == AppLifecycleState.resumed) {
       // Only resume if we were previously backgrounded
       if (_isBackgrounded) {
-        quantusDebugPrint('AppLifecycleState.resumed - resuming from background');
+        quantusPrint('AppLifecycleState.resumed - resuming from background');
         _isBackgrounded = false;
 
         // Only resume polling if online
@@ -96,7 +95,7 @@ class _AppLifecycleManagerState extends ConsumerState<AppLifecycleManager> with 
           pollingManager.resumePolling();
           pollingManager.triggerSilentRefresh();
         } else {
-          quantusDebugPrint('App resumed but offline - polling paused');
+          quantusPrint('App resumed but offline - polling paused');
         }
 
         // Check authentication ONLY on resume from background.
@@ -104,41 +103,28 @@ class _AppLifecycleManagerState extends ConsumerState<AppLifecycleManager> with 
         // that briefly pause/resume the app.
         localAuthNotifier.checkAuthentication();
 
-        // Initialize Taskmaster login if wallet exists
-        _initializeTaskmasterLogin();
-
         // Sync remote config on background resume
         unawaited(ref.read(remoteConfigProvider.notifier).syncConfig());
       }
     } else {
       // Handle background states (inactive, paused, hidden, detached)
-      // Skip if the biometric dialog caused this lifecycle change — on some
-      // Android devices the prompt triggers inactive→resumed oscillation.
-      if (!_isBackgrounded && !ref.read(localAuthProvider).isAuthenticating) {
-        quantusDebugPrint('AppLifecycleState.$state - pausing (update pause time only)');
+      // Skip if an auth dialog caused this lifecycle change — the system prompt
+      // pushes the app into inactive/paused, and treating that as a real
+      // backgrounding re-triggers auth on resume (a double prompt). Check the
+      // service flag too, not just the controller: the send, multisig and
+      // settings flows authenticate through LocalAuthService directly and never
+      // set the controller's isAuthenticating.
+      final authInProgress =
+          ref.read(localAuthProvider).isAuthenticating || ref.read(localAuthServiceProvider).isAuthenticating;
+      if (!_isBackgrounded && !authInProgress) {
+        quantusPrint('$state - pausing (update pause time only)');
         _isBackgrounded = true;
 
         pollingManager.pausePolling();
         localAuthNotifier.recordBackgroundTime();
       } else {
-        quantusDebugPrint('AppLifecycleState.$state - already backgrounded, skipping actions');
+        quantusPrint('$state - already backgrounded, skipping actions');
       }
-    }
-  }
-
-  // This is merely an optimization - check our login is active.
-  Future<void> _initializeTaskmasterLogin() async {
-    try {
-      final settingsService = SettingsService();
-      final hasWallet = await settingsService.getHasWallet();
-
-      if (hasWallet) {
-        final taskmasterService = TaskmasterService();
-        await taskmasterService.ensureIsLoggedIn();
-        quantusDebugPrint('Taskmaster login initialized');
-      }
-    } catch (e) {
-      quantusDebugPrint('Failed to initialize taskmaster login: $e');
     }
   }
 

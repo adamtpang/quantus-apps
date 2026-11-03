@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:resonance_network_wallet/v2/components/glass_button_base.dart';
-import 'package:resonance_network_wallet/v2/screens/accounts/accounts_sheet.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
+import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:resonance_network_wallet/v2/screens/accounts/accounts_screen.dart';
 
 class OpenAccountsManagementButton extends StatelessWidget {
   const OpenAccountsManagementButton({super.key});
@@ -10,11 +9,11 @@ class OpenAccountsManagementButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double buttonHeight = 44;
-    final BorderRadius borderRadius = BorderRadius.circular(36);
+    final BorderRadius borderRadius = context.radiusV3.pillBorder;
     final double iconSize = 20;
 
     return GestureDetector(
-      onTap: () => showAccountsSheet(context),
+      onTap: () => openAccountsScreen(context),
       child: GlassButtonBase(
         buttonHeight: buttonHeight,
         borderRadius: borderRadius,
@@ -29,7 +28,7 @@ class OpenAccountsManagementButton extends StatelessWidget {
                 'assets/v2/caret_left.svg',
                 width: iconSize,
                 height: iconSize,
-                colorFilter: ColorFilter.mode(context.colors.textPrimary, BlendMode.srcIn),
+                colorFilter: ColorFilter.mode(context.colorsV3.textContent, BlendMode.srcIn),
               ),
             ),
           ],

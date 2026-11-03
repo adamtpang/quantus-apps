@@ -1,13 +1,12 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:collection/collection.dart';
 import 'package:quantus_sdk/generated/planck/planck.dart';
 import 'package:quantus_sdk/generated/planck/types/qp_scheduler/block_number_or_timestamp.dart' as qp;
 import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:quantus_sdk/src/extensions/address_extension.dart';
 import 'package:quantus_sdk/src/extensions/duration_extension.dart';
 import 'package:quantus_sdk/src/rust/api/crypto.dart' as crypto;
+import 'package:quantus_sdk/src/utils/print.dart';
 
 class HighSecurityService {
   static final HighSecurityService _instance = HighSecurityService._internal();
@@ -37,26 +36,6 @@ class HighSecurityService {
     return await getHighSecurityConfig(account.accountId) != null;
   }
 
-  Future<bool> isGuardian(Account account) async {
-    return await _reversibleTransfersService.isGuardian(account.accountId);
-  }
-
-  Future<List<EntrustedAccount>> getEntrustedAccounts(Account account) async {
-    final accounts = await AccountsService().getAccounts();
-    String getAccountName(String ss58Address) =>
-        accounts.firstWhereOrNull((a) => a.accountId == ss58Address)?.name ?? 'Entrusted Account';
-    return (await _reversibleTransfersService.getInterceptedAccounts(account.accountId))
-        .mapIndexed(
-          (index, accountId) => EntrustedAccount(
-            parentAccountId: account.accountId,
-            index: index,
-            name: getAccountName(accountId),
-            accountId: accountId,
-          ),
-        )
-        .toList();
-  }
-
   Future<Account?> getGuardianAccount(EntrustedAccount entrustedAccount) async {
     final accounts = await AccountsService().getAccounts();
     return accounts.firstWhere((a) => a.accountId == entrustedAccount.parentAccountId);
@@ -64,7 +43,7 @@ class HighSecurityService {
 
   Future<HighSecurityData?> getHighSecurityConfig(String address) async {
     final hsData = await _reversibleTransfersService.getHighSecurityConfig(address);
-    print('getHighSecurityConfig: $address -> $hsData');
+    quantusPrint('getHighSecurityConfig: $address -> $hsData');
     if (hsData != null) {
       final accountId = AddressExtension.ss58AddressFromBytes(Uint8List.fromList(hsData.guardian));
       if (hsData.delay is! qp.Timestamp) {
@@ -85,7 +64,7 @@ class HighSecurityService {
   /// previous implementation batched recovery-pallet calls, but that pallet
   /// was never configured for accounts, so the rescue path could not work.
   Future<Uint8List> pullAllFunds(String lostAccountAddress, Account guardianAccount) async {
-    print('pullAllFunds: $lostAccountAddress, guardian: ${guardianAccount.accountId}');
+    quantusPrint('pullAllFunds: $lostAccountAddress, guardian: ${guardianAccount.accountId}');
     final call = _getRecoverFundsCall(lostAccountAddress);
     return await _substrateService.submitExtrinsic(guardianAccount, call);
   }

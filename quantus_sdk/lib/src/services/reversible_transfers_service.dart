@@ -10,11 +10,11 @@ import 'package:quantus_sdk/generated/planck/types/primitive_types/h256.dart';
 import 'package:quantus_sdk/generated/planck/types/qp_scheduler/block_number_or_timestamp.dart' as qp;
 import 'package:quantus_sdk/generated/planck/types/quantus_runtime/runtime_call.dart';
 import 'package:quantus_sdk/generated/planck/types/sp_runtime/multiaddress/multi_address.dart' as multi_address;
-import 'package:quantus_sdk/src/extensions/address_extension.dart';
 import 'package:quantus_sdk/src/extensions/duration_extension.dart';
 import 'package:quantus_sdk/src/models/account.dart';
 import 'package:quantus_sdk/src/models/extrinsic_fee_data.dart';
 import 'package:quantus_sdk/src/rust/api/crypto.dart' as crypto;
+import 'package:quantus_sdk/src/utils/print.dart';
 
 import 'substrate_service.dart';
 
@@ -41,7 +41,7 @@ class ReversibleTransfersService {
       call.hashCode;
 
       // Submit the transaction using substrate service
-      return _substrateService.submitExtrinsic(account, call);
+      return await _substrateService.submitExtrinsic(account, call);
     } catch (e) {
       throw Exception('Failed to schedule reversible transfer: $e');
     }
@@ -117,7 +117,7 @@ class ReversibleTransfersService {
       final call = quantusApi.tx.reversibleTransfers.cancel(txId: transactionId);
 
       // Submit the transaction using substrate service
-      return _substrateService.submitExtrinsic(account, call);
+      return await _substrateService.submitExtrinsic(account, call);
     } catch (e) {
       throw Exception('Failed to cancel reversible transfer: $e');
     }
@@ -125,7 +125,7 @@ class ReversibleTransfersService {
 
   /// Query account's reversibility configuration
   Future<HighSecurityAccountData?> getHighSecurityConfig(String address) async {
-    print('getHighSecurityConfig: $address');
+    quantusPrint('getHighSecurityConfig: $address');
     try {
       final quantusApi = Planck(_substrateService.provider!);
       final accountId = crypto.ss58ToAccountId(s: address);
@@ -207,7 +207,7 @@ class ReversibleTransfersService {
         : delay is qp.Timestamp
         ? '${(delay).value0} ms'
         : delay.toJson().toString();
-    print('setHighSecurity: ${account.accountId}, $guardianAccountId, $delayValue');
+    quantusPrint('setHighSecurity: ${account.accountId}, $guardianAccountId, $delayValue');
     try {
       final quantusApi = Planck(_substrateService.provider!);
       final guardianAccountId32 = crypto.ss58ToAccountId(s: guardianAccountId);
@@ -217,22 +217,22 @@ class ReversibleTransfersService {
         delay: delay,
         guardian: guardianAccountId32,
       );
-      print('Encoded Call: ${call.encode()}');
-      print('Encoded Call Hex: ${hex.encode(call.encode())}');
+      quantusPrint('Encoded Call: ${call.encode()}');
+      quantusPrint('Encoded Call Hex: ${hex.encode(call.encode())}');
 
       // Submit the transaction using substrate service
       final res = await _substrateService.submitExtrinsic(account, call);
 
-      print('setHighSecurity done with result: $res');
+      quantusPrint('setHighSecurity done with result: $res');
       return res;
     } catch (e) {
-      print('Failed to enable high security: $e');
+      quantusPrint('Failed to enable high security: $e');
       throw Exception('Failed to enable high security: $e');
     }
   }
 
   Future<bool> isHighSecurity(String address) async {
-    print('isHighSecurity: $address');
+    quantusPrint('isHighSecurity: $address');
     try {
       final config = await getHighSecurityConfig(address);
       return config != null;
@@ -243,33 +243,6 @@ class ReversibleTransfersService {
 
   Future<Uint8List> interceptTransaction({required Account guardianAccount, required H256 transactionId}) async {
     return cancelReversibleTransfer(account: guardianAccount, transactionId: transactionId);
-  }
-
-  /// Check if account is a guardian (interceptor) for any accounts
-  Future<bool> isGuardian(String address) async {
-    print('isGuardian: $address');
-    return (await getInterceptedAccounts(address)).isNotEmpty;
-  }
-
-  /// Get list of accounts that the given account is a guardian (interceptor) for
-  Future<List<String>> getInterceptedAccounts(String guardianAddress) async {
-    print('getInterceptedAccounts: $guardianAddress');
-
-    try {
-      final quantusApi = Planck(_substrateService.provider!);
-      final accountId = crypto.ss58ToAccountId(s: guardianAddress);
-      final interceptedAccounts = await quantusApi.query.reversibleTransfers.guardianIndex(accountId);
-
-      List<String> result = interceptedAccounts.map((id) {
-        final address = AddressExtension.ss58AddressFromBytes(Uint8List.fromList(id));
-        print('intercepted account: $address');
-        return address;
-      }).toList();
-
-      return result;
-    } catch (e) {
-      throw Exception('Failed to get intercepted accounts: $e');
-    }
   }
 
   Future<ExtrinsicFeeData> getHighSecuritySetupFee(

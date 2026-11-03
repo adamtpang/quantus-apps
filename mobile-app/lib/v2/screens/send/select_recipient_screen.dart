@@ -1,28 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/features/components/dotted_border.dart';
-import 'package:resonance_network_wallet/features/components/skeleton.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
+import 'package:resonance_network_wallet/v2/components/dotted_border.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/route_intent_providers.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/routes.dart';
 import 'package:resonance_network_wallet/shared/constants/e2e_keys.dart';
-import 'package:resonance_network_wallet/shared/extensions/toaster_extensions.dart';
+import 'package:resonance_network_wallet/shared/utils/print.dart';
 import 'package:resonance_network_wallet/v2/components/address_checkphrase_with_initial.dart';
 import 'package:resonance_network_wallet/v2/components/address_input_field.dart';
-import 'package:resonance_network_wallet/v2/components/loader.dart';
+import 'package:resonance_network_wallet/v2/components/private_activity_notice.dart';
 import 'package:resonance_network_wallet/v2/components/qr_scanner_page.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base_bottom_content.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
 import 'package:resonance_network_wallet/v2/screens/send/input_amount_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/send/send_strategy.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class SelectRecipientScreen extends ConsumerStatefulWidget {
   final SendStrategy strategy;
@@ -78,11 +72,11 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
       });
       for (final addr in addresses) {
         checksumService.getHumanReadableName(addr).then((name) {
-          if (mounted) setState(() => _checksums[addr] = name);
+          if (mounted && name != null) setState(() => _checksums[addr] = name);
         });
       }
     } catch (e) {
-      debugPrint('SelectRecipientScreen recents: $e');
+      quantusPrint('SelectRecipientScreen recents: $e');
       if (mounted) setState(() => _loadingRecents = false);
     }
   }
@@ -107,23 +101,36 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
     final checksumService = ref.read(humanReadableChecksumServiceProvider);
     final substrate = ref.read(substrateServiceProvider);
     final isValid = substrate.isValidSS58Address(address);
-    final sourceId = widget.strategy.sourceAccountId(ref);
-    final isSelfSend = isValid && address == sourceId;
-    final showSelfSendWarning = isSelfSend && !_isSelfSend;
+    final wasSelfSend = _isSelfSend;
     setState(() {
       _hasAddressError = !isValid;
-      _isSelfSend = isSelfSend;
+      _isSelfSend = false;
       _recipientChecksum = null;
-      _canContinue = isValid && !isSelfSend;
+      _canContinue = false;
     });
-    if (showSelfSendWarning) {
-      context.showWarningToaster(message: ref.read(l10nProvider).sendLogicCantSelfTransfer);
-    }
-    if (isValid) {
-      checksumService.getHumanReadableName(address).then((checksum) {
-        if (mounted) setState(() => _recipientChecksum = checksum);
-      });
-    }
+    if (!isValid) return;
+    // Async: encrypted sends check the address against every derived wormhole
+    // address, not just the account id. Continue stays disabled until resolved.
+    widget.strategy
+        .isSelfRecipient(ref, address)
+        .then((isSelf) {
+          if (!mounted || _recipientController.text.trim() != address) return;
+          setState(() {
+            _isSelfSend = isSelf;
+            _canContinue = !isSelf;
+          });
+          if (isSelf && !wasSelfSend) {
+            context.showWarningToaster(message: ref.read(l10nProvider).sendLogicCantSelfTransfer);
+          }
+        })
+        .catchError((Object e) {
+          // Fail closed: without a verdict the send can't proceed anyway.
+          quantusPrint('SelectRecipientScreen self-send check: $e');
+        });
+    checksumService.getHumanReadableName(address).then((checksum) {
+      if (!mounted || _recipientController.text.trim() != address) return;
+      setState(() => _recipientChecksum = checksum);
+    });
   }
 
   /// Single entry point for every way a recipient is supplied (scan, paste,
@@ -199,8 +206,8 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
     final strings = widget.strategy.strings(l10n);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
 
     return ScaffoldBase(
       key: const Key(E2EKeys.sendSelectRecipientScreen),
@@ -211,16 +218,16 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(strings.recipientSectionLabel, style: text.sendSectionLabel?.copyWith(color: colors.textPrimary)),
+              Text(strings.recipientSectionLabel, style: text.headingRow.copyWith(color: colors.textContent)),
               const SizedBox(height: 12),
-              _buildRecipientField(colors, l10n),
+              _buildRecipientField(l10n),
               const SizedBox(height: 28),
               _buildScanRow(colors, text, l10n),
               const SizedBox(height: 28),
               DottedBorder(
                 dashLength: 3,
                 gapLength: 5,
-                color: colors.borderButton.useOpacity(0.5),
+                color: colors.borderHairline,
                 child: const SizedBox(width: double.infinity, height: 1),
               ),
               const SizedBox(height: 28),
@@ -236,7 +243,7 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
                   SliverToBoxAdapter(
                     child: Text(
                       l10n.sendSelectRecipientRecents,
-                      style: text.smallTitle?.copyWith(color: colors.textPrimary),
+                      style: text.headingRow.copyWith(color: colors.textContent),
                     ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -249,11 +256,8 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (!isFirst) ...[const SizedBox(height: 14)],
-                          _recentRow(_recents[i], colors, text),
-                          if (!isLast) ...[
-                            const SizedBox(height: 14),
-                            Divider(height: 1, color: colors.txItemSeparator),
-                          ],
+                          _recentRow(_recents[i]),
+                          if (!isLast) ...[const SizedBox(height: 14), const MenuDivider()],
                         ],
                       );
                     }, childCount: _recents.length),
@@ -269,7 +273,7 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
     );
   }
 
-  Widget _buildRecipientField(AppColorsV2 colors, AppLocalizations l10n) {
+  Widget _buildRecipientField(AppLocalizations l10n) {
     final hasValid = _recipientController.text.trim().isNotEmpty && !_hasAddressError;
 
     return AddressInputField(
@@ -279,19 +283,11 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
       hasValid: hasValid,
       recipientChecksum: _recipientChecksum,
       hintText: l10n.sendSelectRecipientSearchHint(AppConstants.tokenSymbol),
-      trailing: IconButton(
-        onPressed: _pasteRecipient,
-        icon: const Icon(Icons.paste),
-        iconSize: 20,
-        color: colors.textPrimary,
-        padding: EdgeInsets.zero,
-        visualDensity: VisualDensity.compact,
-        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-      ),
+      trailing: QuantusIconButton.ghost(onTap: _pasteRecipient, icon: Icons.paste, size: IconButtonSize.large),
     );
   }
 
-  Widget _buildScanRow(AppColorsV2 colors, AppTextTheme text, AppLocalizations l10n) {
+  Widget _buildScanRow(AppColorsV3 colors, AppTextThemeV3 text, AppLocalizations l10n) {
     final iconContainerSize = 44.0;
     final iconSize = 24.0;
 
@@ -299,48 +295,48 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: _scanQr,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: context.radiusV3.mdBorder,
         child: Row(
           children: [
             Container(
               width: iconContainerSize,
               height: iconContainerSize,
               decoration: BoxDecoration(
-                color: colors.background,
-                borderRadius: BorderRadius.circular(36),
-                border: Border.all(color: colors.borderButton),
+                color: colors.bgSurface2,
+                borderRadius: BorderRadius.circular(iconContainerSize / 2),
+                border: Border.all(color: colors.borderHairline),
               ),
-              child: Icon(Icons.qr_code_scanner, size: iconSize, color: colors.textPrimary),
+              child: Icon(Icons.qr_code_scanner, size: iconSize, color: colors.textContent),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.sendSelectRecipientScanTitle, style: text.paragraph?.copyWith(color: colors.textPrimary)),
+                  Text(l10n.sendSelectRecipientScanTitle, style: text.bodyLarge.copyWith(color: colors.textContent)),
                   const SizedBox(height: 4),
                   Text(
                     l10n.sendSelectRecipientScanSubtitle(AppConstants.tokenSymbol),
-                    style: text.detail?.copyWith(color: colors.textTertiary),
+                    style: text.caption.copyWith(color: colors.textMuted),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, size: 20, color: colors.textPrimary),
+            QuantusIcon(QuantusIcons.chevronRight, color: colors.textContent),
           ],
         ),
       ),
     );
   }
 
-  Widget _recentRow(String address, AppColorsV2 colors, AppTextTheme text) {
+  Widget _recentRow(String address) {
     final checksum = _checksums[address];
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _onRecentTap(address),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: context.radiusV3.mdBorder,
         child: checksum != null
             ? AddressCheckphraseWithInitial(recipientChecksum: checksum, recipientAddress: address)
             : const Skeleton(height: 36),
@@ -355,13 +351,27 @@ class _SelectRecipientScreenState extends ConsumerState<SelectRecipientScreen> {
         ? l10n.sendLogicCantSelfTransfer
         : l10n.sendEnterAddress;
 
+    final button = QuantusButton.simple(
+      key: const Key(E2EKeys.sendContinueButton),
+      label: btnText,
+      variant: ButtonVariant.primary,
+      isDisabled: !_canContinue,
+      onTap: _continue,
+    );
+
+    if (!widget.strategy.showPrivateSendNotice) {
+      return ScaffoldBaseBottomContent(child: button);
+    }
+
     return ScaffoldBaseBottomContent(
-      child: QuantusButton.simple(
-        key: const Key(E2EKeys.sendContinueButton),
-        label: btnText,
-        variant: ButtonVariant.primary,
-        isDisabled: !_canContinue,
-        onTap: _continue,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PrivateActivityNotice(title: l10n.privateSendTitle, subtitle: l10n.privateSendSubtitle),
+          const SizedBox(height: 32),
+          button,
+        ],
       ),
     );
   }

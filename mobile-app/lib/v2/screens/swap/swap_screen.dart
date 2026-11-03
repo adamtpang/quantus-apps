@@ -3,17 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
 import 'package:resonance_network_wallet/v2/components/qr_scanner_page.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/v2/components/token_icon.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
 import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
+import 'package:resonance_network_wallet/shared/utils/print.dart';
+import 'package:resonance_network_wallet/v2/components/token_icon.dart';
 import 'package:resonance_network_wallet/v2/screens/swap/refund_address_picker_sheet.dart';
 import 'package:resonance_network_wallet/v2/screens/swap/review_quote_sheet.dart';
 import 'package:resonance_network_wallet/v2/screens/swap/token_picker_sheet.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class SwapScreen extends ConsumerStatefulWidget {
   const SwapScreen({super.key});
@@ -40,7 +37,7 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
 
   String _rateLabel(AppLocalizations l10n) {
     final val = 1 / _rate;
-    if (val == 0) return l10n.swapRateZero(_fromToken.symbol);
+    if (val == 0) return l10n.swapRateZero(_fromToken.symbol, AppConstants.tokenSymbol);
     final decimals = val >= 100
         ? 2
         : val >= 1
@@ -52,7 +49,7 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
         : 10;
     var formatted = val.toStringAsFixed(decimals).replaceAll(RegExp(r'0+$'), '');
     if (formatted.endsWith('.')) formatted = formatted.substring(0, formatted.length - 1);
-    return l10n.swapRateLabel(formatted, _fromToken.symbol);
+    return l10n.swapRateLabel(formatted, _fromToken.symbol, AppConstants.tokenSymbol);
   }
 
   @override
@@ -94,7 +91,7 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
       _swapService.addRefundAddress(_fromToken.network, _addressController.text.trim());
       showReviewQuoteSheet(context, quote, _addressController.text);
     } catch (e) {
-      debugPrint('Swap quote failed: $e');
+      quantusPrint('Swap quote failed: $e');
       setState(() => _loading = false);
     }
   }
@@ -123,13 +120,13 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
 
     return ScaffoldBase(
       appBar: V2AppBar(
         title: l10n.swapTitle,
-        trailing: Icon(Icons.info_outline, color: colors.textPrimary, size: 24),
+        trailing: Icon(Icons.info_outline, color: colors.textContent, size: 24),
       ),
       mainContent: Column(
         children: [
@@ -153,18 +150,18 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _quoteButton(l10n, colors, text),
+          _quoteButton(l10n),
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _fromSection(AppLocalizations l10n, AppColorsV2 colors, AppTextTheme text) {
+  Widget _fromSection(AppLocalizations l10n, AppColorsV3 colors, AppTextThemeV3 text) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.swapFrom, style: text.smallParagraph?.copyWith(color: colors.textPrimary)),
+        Text(l10n.swapFrom, style: text.body.copyWith(color: colors.textContent)),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -172,15 +169,15 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
               child: Container(
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(color: colors.surfaceGlass, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
                 alignment: Alignment.centerLeft,
                 child: TextField(
                   controller: _fromController,
-                  style: text.mediumTitle?.copyWith(color: colors.textPrimary, fontWeight: FontWeight.bold),
+                  style: text.amountHero.copyWith(color: colors.textContent),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     hintText: SwapService.formatTokenAmountHint(_fromToken),
-                    hintStyle: text.mediumTitle?.copyWith(color: colors.textTertiary, fontWeight: FontWeight.bold),
+                    hintStyle: text.amountHero.copyWith(color: colors.textMuted2),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
@@ -196,9 +193,10 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
               height: 56,
               child: QuantusButton(
                 centered: false,
+                variant: ButtonVariant.glass,
                 onTap: _pickToken,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                borderRadius: 8,
+                borderRadius: context.radiusV3.mdBorder,
                 child: Row(
                   children: [
                     TokenIcon(token: _fromToken, size: 25, networkBadgeSize: 10),
@@ -209,19 +207,19 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
                         children: [
                           Text(
                             _fromToken.symbol,
-                            style: text.detail?.copyWith(color: colors.textPrimary, fontWeight: FontWeight.w600),
+                            style: text.caption.copyWith(color: colors.textContent),
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             _fromToken.network,
-                            style: text.tiny?.copyWith(color: colors.textSecondary),
+                            style: text.caption.copyWith(color: colors.textMuted),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.keyboard_arrow_down, color: colors.textSecondary, size: 16),
+                    QuantusIcon(QuantusIcons.caretDown, color: colors.textMuted, size: 16),
                   ],
                 ),
               ),
@@ -231,39 +229,39 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
         const SizedBox(height: 4),
         Row(
           children: [
-            Text('\$${_fromUsd.toStringAsFixed(2)}', style: text.detail?.copyWith(color: colors.textSecondary)),
+            Text('\$${_fromUsd.toStringAsFixed(2)}', style: text.caption.copyWith(color: colors.textMuted)),
             const SizedBox(width: 4),
-            Icon(Icons.swap_vert, color: colors.textSecondary, size: 12),
+            QuantusIcon(QuantusIcons.swapVertical, color: colors.textMuted, size: 12),
           ],
         ),
       ],
     );
   }
 
-  Widget _refundAddressSection(AppLocalizations l10n, AppColorsV2 colors, AppTextTheme text) {
+  Widget _refundAddressSection(AppLocalizations l10n, AppColorsV3 colors, AppTextThemeV3 text) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(l10n.swapRefundAddress, style: text.smallParagraph?.copyWith(color: colors.textPrimary)),
+            Text(l10n.swapRefundAddress, style: text.body.copyWith(color: colors.textContent)),
             const SizedBox(width: 4),
-            Icon(Icons.info_outline, color: colors.textSecondary, size: 14),
+            Icon(Icons.info_outline, color: colors.textMuted, size: 14),
           ],
         ),
         const SizedBox(height: 12),
         Container(
-          decoration: BoxDecoration(color: colors.surfaceGlass, borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
           padding: const EdgeInsets.only(left: 12, right: 8, top: 8, bottom: 8),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _addressController,
-                  style: text.smallParagraph?.copyWith(color: colors.textPrimary),
+                  style: text.dataAddressLarge.copyWith(color: colors.textContent),
                   decoration: InputDecoration(
                     hintText: l10n.swapRefundAddressHint(_fromToken.network),
-                    hintStyle: text.smallParagraph?.copyWith(color: colors.textTertiary),
+                    hintStyle: text.dataAddressLarge.copyWith(color: colors.textMuted),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
@@ -294,45 +292,46 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
     );
   }
 
-  Widget _swapDivider(AppColorsV2 colors) {
+  Widget _swapDivider(AppColorsV3 colors) {
     return Row(
       children: [
-        Expanded(child: Divider(color: colors.separator)),
+        const Expanded(child: MenuDivider()),
         SizedBox(
           width: 40,
           height: 40,
           child: _smallIconButton(colors: colors, iconAsset: _swapDirectionIconAsset, onTap: () {}),
         ),
-        Expanded(child: Divider(color: colors.separator)),
+        const Expanded(child: MenuDivider()),
       ],
     );
   }
 
-  Widget _smallIconButton({required AppColorsV2 colors, required String iconAsset, VoidCallback? onTap}) {
+  Widget _smallIconButton({required AppColorsV3 colors, required String iconAsset, VoidCallback? onTap}) {
     return SizedBox(
       width: 40,
       height: 40,
       child: QuantusButton(
         onTap: onTap,
+        variant: ButtonVariant.glass,
         padding: EdgeInsets.zero,
-        borderRadius: 8,
+        borderRadius: context.radiusV3.smBorder,
         child: Center(
           child: SvgPicture.asset(
             iconAsset,
             width: 20,
             height: 20,
-            colorFilter: ColorFilter.mode(colors.textPrimary, BlendMode.srcIn),
+            colorFilter: ColorFilter.mode(colors.textContent, BlendMode.srcIn),
           ),
         ),
       ),
     );
   }
 
-  Widget _toSection(AppLocalizations l10n, AppColorsV2 colors, AppTextTheme text) {
+  Widget _toSection(AppLocalizations l10n, AppColorsV3 colors, AppTextThemeV3 text) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.swapTo, style: text.smallParagraph?.copyWith(color: colors.textPrimary)),
+        Text(l10n.swapTo, style: text.body.copyWith(color: colors.textContent)),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -340,14 +339,11 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
               child: Container(
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(color: colors.surfaceGlass, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
                 alignment: Alignment.centerLeft,
                 child: Text(
                   SwapService.formatTokenAmount(_toAmount, _swapService.getQuToken()),
-                  style: text.mediumTitle?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: _toAmount > 0 ? colors.textPrimary : colors.textTertiary,
-                  ),
+                  style: text.amountHero.copyWith(color: _toAmount > 0 ? colors.textContent : colors.textMuted2),
                 ),
               ),
             ),
@@ -357,25 +353,16 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
               height: 56,
               child: QuantusButton(
                 centered: false,
+                variant: ButtonVariant.glass,
                 onTap: () {},
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                borderRadius: 8,
+                borderRadius: context.radiusV3.mdBorder,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 25,
-                      height: 25,
-                      decoration: BoxDecoration(
-                        color: colors.accentGreen.withValues(alpha: 0.3),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                    TokenIcon(token: _swapService.getQuToken(), size: 25, networkBadgeSize: 10),
                     const SizedBox(width: 8),
-                    Text(
-                      'QUAN',
-                      style: text.smallParagraph?.copyWith(color: colors.textPrimary, fontWeight: FontWeight.w600),
-                    ),
+                    Text(AppConstants.tokenSymbol, style: text.body.copyWith(color: colors.textContent)),
                   ],
                 ),
               ),
@@ -383,23 +370,23 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
           ],
         ),
         const SizedBox(height: 4),
-        Text('\$${_toUsd.toStringAsFixed(2)}', style: text.detail?.copyWith(color: colors.textSecondary)),
+        Text('\$${_toUsd.toStringAsFixed(2)}', style: text.caption.copyWith(color: colors.textMuted)),
       ],
     );
   }
 
-  Widget _infoSection(AppLocalizations l10n, AppColorsV2 colors, AppTextTheme text) {
+  Widget _infoSection(AppLocalizations l10n, AppColorsV3 colors, AppTextThemeV3 text) {
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(l10n.swapSlippageTolerance, style: text.detail?.copyWith(color: colors.textSecondary)),
+            Text(l10n.swapSlippageTolerance, style: text.caption.copyWith(color: colors.textMuted)),
             Row(
               children: [
-                Text('1%', style: text.detail?.copyWith(color: colors.textSecondary)),
+                Text('1%', style: text.caption.copyWith(color: colors.textMuted)),
                 const SizedBox(width: 4),
-                Icon(Icons.settings, color: colors.textSecondary, size: 12),
+                Icon(Icons.settings, color: colors.textMuted, size: 12),
               ],
             ),
           ],
@@ -408,24 +395,21 @@ class _SwapScreenState extends ConsumerState<SwapScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(l10n.swapRate, style: text.detail?.copyWith(color: colors.textSecondary)),
-            Text(
-              _rateLabel(l10n),
-              style: text.detail?.copyWith(color: colors.textSecondary, fontWeight: FontWeight.w500),
-            ),
+            Text(l10n.swapRate, style: text.caption.copyWith(color: colors.textMuted)),
+            Text(_rateLabel(l10n), style: text.caption.copyWith(color: colors.textMuted)),
           ],
         ),
       ],
     );
   }
 
-  Widget _quoteButton(AppLocalizations l10n, AppColorsV2 colors, AppTextTheme text) {
+  Widget _quoteButton(AppLocalizations l10n) {
     final enabled = _canGetQuote && !_loading;
     return QuantusButton.simple(
       label: l10n.swapGetQuote,
       onTap: _getQuote,
       isDisabled: !enabled,
-      variant: ButtonVariant.secondary,
+      variant: ButtonVariant.staged,
     );
   }
 }

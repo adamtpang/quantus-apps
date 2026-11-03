@@ -1,27 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/features/components/skeleton.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
+import 'package:resonance_network_wallet/v2/components/multisig_signer_list_tile.dart';
+import 'package:resonance_network_wallet/v2/components/multisig_threshold_slider.dart';
+import 'package:resonance_network_wallet/v2/components/name_field.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/account_providers.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/providers/multisig_providers.dart';
 import 'package:resonance_network_wallet/providers/pending_multisig_creations_provider.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
-import 'package:resonance_network_wallet/shared/extensions/toaster_extensions.dart';
 import 'package:resonance_network_wallet/shared/utils/print.dart';
-import 'package:resonance_network_wallet/v2/components/multisig_signer_list_tile.dart';
-import 'package:resonance_network_wallet/v2/components/multisig_threshold_slider.dart';
-import 'package:resonance_network_wallet/v2/components/name_field.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base_bottom_content.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
 import 'package:resonance_network_wallet/services/local_auth_service.dart';
 import 'package:resonance_network_wallet/services/multisig_submission_service.dart';
 import 'package:resonance_network_wallet/v2/screens/accounts/accounts_navigation.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class AddMultisigScreen extends ConsumerStatefulWidget {
   const AddMultisigScreen({super.key});
@@ -180,7 +173,7 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
         _isPredictingAddress = false;
       });
     } on MultisigNonceExhaustedException {
-      quantusDebugPrint('[AddMultisigScreen] refreshPredictedAddress: MultisigNonceExhaustedException');
+      quantusPrint('[AddMultisigScreen] refreshPredictedAddress: MultisigNonceExhaustedException');
 
       if (!mounted || seq != _predictSeq) return;
       setState(() {
@@ -189,7 +182,7 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
         _isPredictingAddress = false;
       });
     } catch (e) {
-      quantusDebugPrint('[AddMultisigScreen] refreshPredictedAddress: unknown error: $e');
+      quantusPrint('[AddMultisigScreen] refreshPredictedAddress: unknown error: $e');
 
       if (!mounted || seq != _predictSeq) return;
       setState(() {
@@ -230,7 +223,7 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
       if (mounted) setState(() => _isLoading = false);
       return;
     } catch (e) {
-      quantusDebugPrint('[AddMultisigScreen] preflight error: $e');
+      quantusPrint('[AddMultisigScreen] preflight error: $e');
 
       if (mounted) {
         context.showErrorToaster(message: l10n.multisigCreateErrorCouldNotCreate);
@@ -255,7 +248,7 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
       );
 
       if (!mounted) return;
-      returnToAccountsSheet(context, ref, highlightAccountId: _predictedAddress!);
+      returnToAccountsScreen(context, ref, highlightAccountId: _predictedAddress!);
     } on MultisigAlreadyExistsException {
       if (mounted) {
         context.showErrorToaster(message: l10n.multisigCreateAlreadyExists);
@@ -265,7 +258,7 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
         context.showErrorToaster(message: l10n.multisigCreateInsufficientBalance);
       }
     } catch (e) {
-      quantusDebugPrint('[AddMultisigScreen] createMultisig error: $e');
+      quantusPrint('[AddMultisigScreen] createMultisig error: $e');
       if (mounted) {
         context.showErrorToaster(message: l10n.multisigCreateErrorCouldNotCreate);
       }
@@ -280,8 +273,6 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
     final pendingCreations = ref.watch(pendingMultisigCreationsProvider);
     final isCreatingInFlight =
         _predictedAddress != null && pendingCreations.any((e) => e.multisigAddress == _predictedAddress);
-    final colors = context.colors;
-    final text = context.themeText;
     final displayThreshold = _allSigners.isEmpty ? 1 : _threshold.clamp(1, _allSigners.length);
 
     return ScaffoldBase(
@@ -295,8 +286,6 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
             const SizedBox(height: 28),
             _SignersSection(
               l10n: l10n,
-              colors: colors,
-              text: text,
               creatorAccountId: _creator?.accountId,
               creatorChecksum: _creatorChecksum,
               additionalSigners: _additionalSigners,
@@ -314,13 +303,7 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
               onChanged: _onThresholdChanged,
             ),
             const SizedBox(height: 28),
-            _PredictedAddressSection(
-              l10n: l10n,
-              colors: colors,
-              text: text,
-              isLoading: _isPredictingAddress,
-              address: _predictedAddress,
-            ),
+            _PredictedAddressSection(l10n: l10n, isLoading: _isPredictingAddress, address: _predictedAddress),
           ],
         ),
       ),
@@ -339,8 +322,6 @@ class _AddMultisigScreenState extends ConsumerState<AddMultisigScreen> {
 class _SignersSection extends StatelessWidget {
   const _SignersSection({
     required this.l10n,
-    required this.colors,
-    required this.text,
     required this.creatorAccountId,
     required this.creatorChecksum,
     required this.additionalSigners,
@@ -351,8 +332,6 @@ class _SignersSection extends StatelessWidget {
   });
 
   final AppLocalizations l10n;
-  final AppColorsV2 colors;
-  final AppTextTheme text;
   final String? creatorAccountId;
   final String? creatorChecksum;
   final List<String> additionalSigners;
@@ -368,15 +347,18 @@ class _SignersSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: colors.surfaceDeep, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l10n.multisigCreateSignersLabel, style: text.receiveLabel?.copyWith(color: colors.textLabel)),
+          Text(l10n.multisigCreateSignersLabel, style: text.labelData.copyWith(color: colors.textMuted)),
           const SizedBox(height: 8),
-          Text(l10n.multisigCreateSignersSubtitle, style: text.detail?.copyWith(color: colors.textTertiary)),
+          Text(l10n.multisigCreateSignersSubtitle, style: text.caption.copyWith(color: colors.textMuted)),
           const SizedBox(height: 16),
           if (creatorAccountId != null)
             MultisigSignerListTile(
@@ -384,49 +366,27 @@ class _SignersSection extends StatelessWidget {
               checksum: creatorChecksum,
               isYou: true,
               youLabel: l10n.multisigYouLabel,
-              colors: colors,
-              text: text,
             ),
           ...additionalSigners.map(
-            (address) => MultisigSignerListTile(
-              accountId: address,
-              onRemove: () => onRemoveSigner(address),
-              colors: colors,
-              text: text,
-            ),
+            (address) => MultisigSignerListTile(accountId: address, onRemove: () => onRemoveSigner(address)),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            height: 48,
-            decoration: BoxDecoration(color: colors.sheetBackground, borderRadius: BorderRadius.circular(8)),
-            child: Row(
-              children: [
-                Icon(Icons.person_add_outlined, size: 16, color: colors.textLabel),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: signerAddressController,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    style: text.smallParagraph?.copyWith(color: colors.textPrimary),
-                    decoration: InputDecoration(hintText: l10n.multisigCreateAddSignerHint, border: InputBorder.none),
-                    onSubmitted: (_) => onAddSigner(),
-                  ),
-                ),
-              ],
-            ),
+          QuantusTextField(
+            controller: signerAddressController,
+            hint: l10n.multisigCreateAddSignerHint,
+            error: signerFieldError,
+            autocorrect: false,
+            enableSuggestions: false,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => onAddSigner(),
           ),
-          if (signerFieldError != null) ...[
-            const SizedBox(height: 8),
-            Text(signerFieldError!, style: text.detail?.copyWith(color: colors.textError)),
-          ],
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
             child: QuantusButton.simple(
               label: l10n.multisigCreateAddSignerButton,
-              variant: ButtonVariant.secondary,
+              variant: ButtonVariant.staged,
               isDisabled: !_canAddSigner,
               onTap: onAddSigner,
               width: null,
@@ -440,17 +400,9 @@ class _SignersSection extends StatelessWidget {
 }
 
 class _PredictedAddressSection extends ConsumerStatefulWidget {
-  const _PredictedAddressSection({
-    required this.l10n,
-    required this.colors,
-    required this.text,
-    required this.isLoading,
-    required this.address,
-  });
+  const _PredictedAddressSection({required this.l10n, required this.isLoading, required this.address});
 
   final AppLocalizations l10n;
-  final AppColorsV2 colors;
-  final AppTextTheme text;
   final bool isLoading;
   final String? address;
 
@@ -482,37 +434,34 @@ class _PredictedAddressSectionState extends ConsumerState<_PredictedAddressSecti
     _loadChecksum();
     final isReady = widget.address != null && _checksum != null;
 
-    quantusDebugPrint('[PredictedAddressSection] address: ${widget.address}');
-    quantusDebugPrint('[PredictedAddressSection] checksum: $_checksum');
-    quantusDebugPrint('[PredictedAddressSection] isReady: $isReady');
+    quantusPrint('[PredictedAddressSection] address: ${widget.address}');
+    quantusPrint('[PredictedAddressSection] checksum: $_checksum');
+    quantusPrint('[PredictedAddressSection] isReady: $isReady');
+
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: widget.colors.surfaceDeep, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             widget.l10n.multisigCreatePredictedAddressLabel,
-            style: widget.text.receiveLabel?.copyWith(color: widget.colors.textLabel),
+            style: text.labelData.copyWith(color: colors.textMuted),
           ),
           const SizedBox(height: 12),
           if (widget.isLoading)
             const Skeleton(height: 20)
           else if (isReady) ...[
-            Text(_checksum!, style: widget.text.smallParagraph?.copyWith(color: widget.colors.checksum)),
+            Text(_checksum!, style: text.body.copyWith(color: colors.semanticLilac)),
             const SizedBox(height: 4),
-            Text(
-              widget.address!,
-              style: widget.text.smallParagraph?.copyWith(
-                color: widget.colors.textPrimary,
-                fontFamily: AppTextTheme.fontFamilySecondary,
-              ),
-            ),
+            Text(widget.address!, style: text.dataAddressLarge.copyWith(color: colors.textContent)),
           ] else
             Text(
               widget.l10n.multisigCreatePredictedAddressPlaceholder,
-              style: widget.text.detail?.copyWith(color: widget.colors.textTertiary),
+              style: text.caption.copyWith(color: colors.textMuted),
             ),
         ],
       ),

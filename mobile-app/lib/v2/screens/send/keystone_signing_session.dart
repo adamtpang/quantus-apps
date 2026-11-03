@@ -13,8 +13,7 @@ typedef KeystoneSignatureSubmitter =
     Future<String> Function(
       WidgetRef ref, {
       required UnsignedTransactionData unsignedData,
-      required Uint8List signature,
-      required Uint8List publicKey,
+      required Uint8List signatureWithPublicKey,
     });
 
 /// Describes one Keystone hardware-signing flow.
@@ -24,7 +23,6 @@ typedef KeystoneSignatureSubmitter =
 class KeystoneSigningSession {
   final Account account;
   final RuntimeCall Function() buildCall;
-  final String title;
   final String? primaryDetail;
   final String? secondaryDetail;
   final String? tertiaryDetail;
@@ -35,7 +33,6 @@ class KeystoneSigningSession {
   const KeystoneSigningSession({
     required this.account,
     required this.buildCall,
-    required this.title,
     required this.submitSigned,
     this.primaryDetail,
     this.secondaryDetail,

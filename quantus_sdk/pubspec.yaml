@@ -19,8 +19,20 @@ dependencies:
   # Shared (canonical versions in melos.yaml)
   # DO NOT UPDATE polkadart - newer versions are incompatible with our ML-DSA
   # signature override, work completely differently, and add no benefits.
+  #
+  # The fork also carries a security fix to the code generator. Upstream emits a
+  # compact integer for the MultiAddress::Index variant where the metadata
+  # declares the field zero-width. A codec that disagrees with the metadata about
+  # a field's width re-frames every byte after it, so a crafted payload can
+  # display one call and sign another - a clearsigning bypass on the cold wallet.
+  # Pinned by test/chain/multi_address_codec_test.dart. Never regenerate the
+  # bindings with pub.dev polkadart_cli.
   # Re-exported from quantus_sdk.dart so apps don't need a direct polkadart dep.
-  polkadart: ^0.7.3
+  polkadart:
+    git:
+      url: https://github.com/Quantus-Network/polkadart.git
+      ref: 0_7_3_quantus_2
+      path: packages/polkadart
   bip39_mnemonic: ^4.0.1
   convert: ^3.1.2
   http: ^1.6.0
@@ -31,7 +43,11 @@ dependencies:
   collection: ^1.19.1
 
   # SDK-only
-  ss58: ^1.3.1
+  ss58:
+    git:
+      url: https://github.com/Quantus-Network/polkadart.git
+      ref: 0_7_3_quantus_2
+      path: packages/ss58
   intl: ^0.20.2
   flutter_secure_storage: ^10.1.0
   connectivity_plus: ^7.1.1
@@ -43,16 +59,39 @@ dependencies:
       ref: v2.2.0
       path: dart
 
+  qr_flutter: ^4.1.0
+  flutter_svg: ^2.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  # DO NOT UPDATE polkadart_cli - must match polkadart 0.7.x. See note above.
-  polkadart_cli: ^0.7.1
-
+  # Used by tool/generate_call_corpus.dart to enumerate the runtime's calls.
+  polkadart_scale_codec:
+    git:
+      url: https://github.com/Quantus-Network/polkadart.git
+      ref: 0_7_3_quantus_2
+      path: packages/polkadart_scale_codec
+  substrate_metadata:
+    git:
+      url: https://github.com/Quantus-Network/polkadart.git
+      ref: 0_7_3_quantus_2
+      path: packages/substrate_metadata
+  # DO NOT UPDATE polkadart_cli - must match polkadart 0.7.x, and generates the
+  # MultiAddress::Index codec correctly. See note above.
+  polkadart_cli:
+    git:
+      url: https://github.com/Quantus-Network/polkadart.git
+      ref: 0_7_3_quantus_2
+      path: packages/polkadart_cli
 polkadart:
   output_dir: lib/generated
   chains:
     planck: wss://a1-planck.quantus.cat
+
+flutter:
+  assets:
+    - assets/v2/uppercase_q_black_bg.png
+    - assets/icons/

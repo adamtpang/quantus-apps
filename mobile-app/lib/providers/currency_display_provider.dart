@@ -1,13 +1,14 @@
 import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:quantus_sdk/quantus_sdk.dart';
 import 'package:resonance_network_wallet/models/fiat_currency.dart';
+import 'package:resonance_network_wallet/providers/account_providers.dart';
 import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/services/exchange_rate_service.dart';
+import 'package:resonance_network_wallet/shared/utils/print.dart';
 
 // ---------------------------------------------------------------------------
 // Exchange rate caching helpers
@@ -32,7 +33,7 @@ Map<String, Decimal>? _readRatesCache(SettingsService settings) {
     if (nowUnix >= expiryUnix) return null;
     return _parseRatesMap(decoded['rates'] as Map<String, dynamic>);
   } catch (e) {
-    debugPrint('Failed parsing exchange rates: $e');
+    quantusPrint('Failed parsing exchange rates: $e');
     return null;
   }
 }
@@ -51,7 +52,7 @@ Map<String, Decimal> _readRatesCacheAnyAge(SettingsService settings) {
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
     return _parseRatesMap(decoded['rates'] as Map<String, dynamic>);
   } catch (e) {
-    debugPrint('Failed parsing exchange rates cache: $e');
+    quantusPrint('Failed parsing exchange rates cache: $e');
 
     return ExchangeRateService.fallbackRates;
   }
@@ -65,7 +66,7 @@ const _kMinCacheTtlSeconds = 60;
 Future<void> _writeRatesCache(SettingsService settings, Map<String, Decimal> rates, int timeNextUpdateUnix) async {
   final nowUnix = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   if (timeNextUpdateUnix <= nowUnix + _kMinCacheTtlSeconds) {
-    debugPrint(
+    quantusPrint(
       'Skipping exchange rates cache write: timeNextUpdateUnix=$timeNextUpdateUnix '
       'is not at least ${_kMinCacheTtlSeconds}s in the future (now=$nowUnix).',
     );
@@ -96,13 +97,13 @@ final exchangeRatesProvider = FutureProvider<Map<String, Decimal>>((ref) async {
   if (cached != null) return cached;
 
   try {
-    final result = await TaskmasterService().getExchangeRates();
+    final result = await QuersiService().getExchangeRates();
     final rates = result.rates.map((k, v) => MapEntry(k, Decimal.parse(v.toString())));
     await _writeRatesCache(settings, rates, result.timeNextUpdateUnix);
 
     return rates;
   } catch (e) {
-    debugPrint('Failed fetching exchange rates: $e');
+    quantusPrint('Failed fetching exchange rates: $e');
 
     return _readRatesCacheAnyAge(settings);
   }
@@ -171,10 +172,10 @@ class SelectedFiatCurrencyNotifier extends StateNotifier<FiatCurrency> {
 // Currency flip provider
 // ---------------------------------------------------------------------------
 
-/// Whether fiat is shown as the primary (large) display and QUAN secondary.
+/// Whether fiat is shown as the primary (large) display and the token secondary.
 ///
-/// false → primary = QUAN,  secondary = fiat  (default)
-/// true  → primary = fiat,  secondary = QUAN
+/// false → primary = token,  secondary = fiat  (default)
+/// true  → primary = fiat,  secondary = token
 ///
 /// To toggle from the swap button:
 ///   ref.read(isCurrencyFlippedProvider.notifier).toggle();
@@ -238,13 +239,17 @@ class CurrencyDisplayState {
 // Balance display provider
 // ---------------------------------------------------------------------------
 
-final _hiddenAmountText = '-----';
-
-/// Combines balance, hidden state, flip state, selected fiat, and exchange
-/// rate into [CurrencyDisplayState] ready for widgets to render.
+/// Combines balance, flip state, selected fiat, and exchange rate into
+/// [CurrencyDisplayState] ready for widgets to render.
+///
+/// Hiding balances is a UX concern owned by the screen that offers the toggle,
+/// which passes it into AmountDisplayWithConversion; it is deliberately absent
+/// here so unrelated screens never inherit it.
 final balanceDisplayProvider = Provider<AsyncValue<CurrencyDisplayState>>((ref) {
-  final balanceAsync = ref.watch(balanceProvider);
-  final isHidden = ref.watch(isBalanceHiddenProvider);
+  final active = ref.watch(activeAccountProvider).value;
+  final balanceAsync = active != null && isEncryptedAccount(active.account)
+      ? ref.watch(encryptedBalanceProvider((active.account as Account).walletIndex))
+      : ref.watch(balanceProvider);
   final isFlipped = ref.watch(isCurrencyFlippedProvider);
   final selectedFiat = ref.watch(selectedFiatCurrencyProvider);
   final xRate = ref.watch(exchangeRateServiceProvider);
@@ -260,11 +265,9 @@ final balanceDisplayProvider = Provider<AsyncValue<CurrencyDisplayState>>((ref) 
         selectedFiat,
         xRate,
         fmt,
-        _hiddenAmountText,
-        quanDecimals: 3,
+        tokenDecimals: 3,
         isFlipped: isFlipped,
-        isHidden: isHidden,
-        withQuanSymbol: false,
+        withTokenSymbol: false,
         localeConfig: localeConfig,
       );
       return AsyncValue.data(data);
@@ -276,59 +279,53 @@ final balanceDisplayProvider = Provider<AsyncValue<CurrencyDisplayState>>((ref) 
 // Per-amount display provider (for transaction items)
 // ---------------------------------------------------------------------------
 
-final txAmountDisplayProvider =
-    Provider<
-      CurrencyDisplayState Function(
-        BigInt, {
-        required bool isSend,
-        int quanDecimals,
-        bool withQuanSymbol,
-        bool withSignPrefix,
-        String? customHiddenText,
-      })
-    >((ref) {
-      final isHidden = ref.watch(isBalanceHiddenProvider);
-      final isFlipped = ref.watch(isCurrencyFlippedProvider);
-      final selectedFiat = ref.watch(selectedFiatCurrencyProvider);
-      final xRate = ref.watch(exchangeRateServiceProvider);
-      final fmt = ref.watch(numberFormattingServiceProvider);
-      final localeConfig = ref.watch(localeNumberConfigProvider);
-
-      return (
-        BigInt amount, {
-        required bool isSend,
-        bool withQuanSymbol = true,
-        bool withSignPrefix = true,
-        int quanDecimals = 2,
-        String? customHiddenText,
-      }) {
-        final hiddenText = customHiddenText ?? _hiddenAmountText;
-        final prefix = isSend ? '-' : '+';
-
-        CurrencyDisplayState data = _toFiatDisplayState(
-          amount,
-          selectedFiat,
-          xRate,
-          fmt,
-          hiddenText,
-          quanDecimals: quanDecimals,
-          isHidden: isHidden,
-          withQuanSymbol: withQuanSymbol,
-          isFlipped: isFlipped,
-          localeConfig: localeConfig,
-        );
-
-        if (!isHidden) {
-          data = data.copyWith(primaryAmount: withSignPrefix ? '$prefix${data.primaryAmount}' : data.primaryAmount);
-        }
-
-        if (!withQuanSymbol && isFlipped && !isHidden) {
-          data = data.copyWith(secondaryAmount: '${data.secondaryAmount} ${AppConstants.tokenSymbol}');
-        }
-
-        return data;
-      };
+typedef TxAmountFormatter =
+    CurrencyDisplayState Function(
+      BigInt, {
+      required bool isSend,
+      int tokenDecimals,
+      bool withTokenSymbol,
+      bool withSignPrefix,
     });
+
+final txAmountDisplayProvider = Provider<TxAmountFormatter>((ref) {
+  final isFlipped = ref.watch(isCurrencyFlippedProvider);
+  final selectedFiat = ref.watch(selectedFiatCurrencyProvider);
+  final xRate = ref.watch(exchangeRateServiceProvider);
+  final fmt = ref.watch(numberFormattingServiceProvider);
+  final localeConfig = ref.watch(localeNumberConfigProvider);
+
+  return (
+    BigInt amount, {
+    required bool isSend,
+    bool withTokenSymbol = true,
+    bool withSignPrefix = true,
+    int tokenDecimals = 2,
+  }) {
+    final prefix = isSend ? '-' : '+';
+
+    CurrencyDisplayState data = _toFiatDisplayState(
+      amount,
+      selectedFiat,
+      xRate,
+      fmt,
+      tokenDecimals: tokenDecimals,
+      withTokenSymbol: withTokenSymbol,
+      isFlipped: isFlipped,
+      localeConfig: localeConfig,
+    );
+
+    if (withSignPrefix) {
+      data = data.copyWith(primaryAmount: '$prefix${data.primaryAmount}');
+    }
+
+    if (!withTokenSymbol && isFlipped) {
+      data = data.copyWith(secondaryAmount: '${data.secondaryAmount} ${AppConstants.tokenSymbol}');
+    }
+
+    return data;
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -343,7 +340,7 @@ String _toFiatNumeric(
   ExchangeRateService xRate, {
   required LocaleNumberConfig localeConfig,
 }) {
-  final fiatValue = xRate.quanRawToFiat(rawBalance, fiat, AppConstants.decimals);
+  final fiatValue = xRate.tokenToFiat(rawBalance, fiat, AppConstants.decimals);
   final canonical = fiatValue.toStringAsFixed(fiat.decimals);
 
   return localeConfig.localize(canonical);
@@ -353,27 +350,19 @@ CurrencyDisplayState _toFiatDisplayState(
   BigInt amount,
   FiatCurrency selectedFiat,
   ExchangeRateService xRate,
-  NumberFormattingService fmt,
-  String hiddenText, {
-  required int quanDecimals,
+  NumberFormattingService fmt, {
+  required int tokenDecimals,
   required bool isFlipped,
-  required bool isHidden,
-  required bool withQuanSymbol,
+  required bool withTokenSymbol,
   required LocaleNumberConfig localeConfig,
 }) {
-  final quanFormatted = fmt.formatBalance(amount, smartDecimals: quanDecimals, addSymbol: withQuanSymbol);
+  final tokenFormatted = fmt.formatBalance(amount, smartDecimals: tokenDecimals, addSymbol: withTokenSymbol);
   final fiatFormatted = selectedFiat.format(_toFiatNumeric(amount, selectedFiat, xRate, localeConfig: localeConfig));
 
-  CurrencyDisplayState data = CurrencyDisplayState(
-    primaryAmount: isFlipped ? fiatFormatted : quanFormatted,
-    secondaryAmount: isFlipped ? quanFormatted : fiatFormatted,
+  return CurrencyDisplayState(
+    primaryAmount: isFlipped ? fiatFormatted : tokenFormatted,
+    secondaryAmount: isFlipped ? tokenFormatted : fiatFormatted,
     isFlipped: isFlipped,
     selectedFiat: selectedFiat,
   );
-
-  if (isHidden) {
-    data = data.copyWith(primaryAmount: hiddenText, secondaryAmount: hiddenText);
-  }
-
-  return data;
 }

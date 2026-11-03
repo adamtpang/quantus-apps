@@ -4,26 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:quantus_sdk/quantus_sdk.dart';
 import 'package:resonance_network_wallet/v2/screens/send/keystone_sign_cache.dart';
 
-/// Mortal era validity for Keystone payloads (eraPeriod 64, ~12s blocks, 2-block margin).
-Duration _mortalEraMaxCacheAge(QuantusSigningPayload payload) => keystoneSignCacheMaxAge(payload);
+import '../fakes.dart';
 
-UnsignedTransactionData _fakeUnsignedData() {
-  return UnsignedTransactionData(
-    payloadToSign: QuantusSigningPayload(
-      method: Uint8List(0),
-      specVersion: 1,
-      transactionVersion: 1,
-      genesisHash: '0x00',
-      blockHash: '0x00',
-      blockNumber: 42,
-      eraPeriod: 64,
-      nonce: 0,
-      tip: 0,
-    ),
-    signer: Uint8List(32),
-    registry: Object(),
-  );
-}
+/// Mortal era validity for Keystone payloads: the era minus the round-trip reserve.
+Duration _mortalEraMaxCacheAge(QuantusSigningPayload payload) => keystoneSignCacheMaxAge(payload);
 
 void main() {
   group('KeystoneSignCacheKey', () {
@@ -82,7 +66,7 @@ void main() {
     });
 
     test('store and lookup return entry for matching key', () {
-      final unsigned = _fakeUnsignedData();
+      final unsigned = makeUnsignedTransactionData();
       const urParts = ['ur:part1', 'ur:part2'];
 
       notifier.store(key: key, unsignedData: unsigned, urParts: urParts);
@@ -95,13 +79,13 @@ void main() {
     });
 
     test('lookup returns null for different key', () {
-      notifier.store(key: key, unsignedData: _fakeUnsignedData(), urParts: const ['ur:part1']);
+      notifier.store(key: key, unsignedData: makeUnsignedTransactionData(), urParts: const ['ur:part1']);
 
       expect(notifier.lookup(otherKey), isNull);
     });
 
     test('startNewSendSession invalidates prior entry until re-stored', () {
-      notifier.store(key: key, unsignedData: _fakeUnsignedData(), urParts: const ['ur:part1']);
+      notifier.store(key: key, unsignedData: makeUnsignedTransactionData(), urParts: const ['ur:part1']);
       expect(notifier.lookup(key), isNotNull);
 
       notifier.startNewSendSession();
@@ -110,15 +94,27 @@ void main() {
     });
 
     test('second startNewSendSession requires fresh store even when params unchanged', () {
-      notifier.store(key: key, unsignedData: _fakeUnsignedData(), urParts: const ['ur:first']);
+      notifier.store(key: key, unsignedData: makeUnsignedTransactionData(), urParts: const ['ur:first']);
       notifier.startNewSendSession();
 
-      final unsigned = _fakeUnsignedData();
+      final unsigned = makeUnsignedTransactionData();
       notifier.store(key: key, unsignedData: unsigned, urParts: const ['ur:second']);
 
       final entry = notifier.lookup(key);
       expect(entry, isNotNull);
       expect(entry!.urParts, const ['ur:second']);
+    });
+  });
+
+  group('keystoneSignCacheMaxAge', () {
+    test('leaves the full round-trip reserve of era lifetime unused', () {
+      final payload = makeUnsignedTransactionData().payloadToSign;
+      final expectedSeconds = (payload.eraPeriod - keystoneSignEraReserveBlocks) * AppConstants.avgBlockTimeSeconds;
+      expect(keystoneSignCacheMaxAge(payload), Duration(seconds: expectedSeconds));
+    });
+
+    test('the live era period keeps a positive usable window', () {
+      expect(AppConstants.txMortalEraPeriodBlocks, greaterThan(keystoneSignEraReserveBlocks));
     });
   });
 
@@ -132,7 +128,7 @@ void main() {
     final key = KeystoneSignCacheKey(accountId: 'account-a', recipientAddress: 'recipient', amount: BigInt.from(100));
 
     test('lookup returns null when user returns after mortal era expires', () {
-      final unsigned = _fakeUnsignedData();
+      final unsigned = makeUnsignedTransactionData();
       final storedAt = DateTime(2026, 1, 1, 12, 0, 0);
       final now = storedAt.add(_mortalEraMaxCacheAge(unsigned.payloadToSign));
 
@@ -142,13 +138,32 @@ void main() {
     });
 
     test('lookup still returns entry within mortal era window', () {
-      final unsigned = _fakeUnsignedData();
+      final unsigned = makeUnsignedTransactionData();
       final storedAt = DateTime(2026, 1, 1, 12, 0, 0);
       final now = storedAt.add(_mortalEraMaxCacheAge(unsigned.payloadToSign) - const Duration(seconds: 1));
 
       notifier.store(key: key, unsignedData: unsigned, urParts: const ['ur:fresh'], storedAt: storedAt);
 
       expect(notifier.lookup(key, now: now), isNotNull);
+    });
+  });
+
+  group('what an air-gapped signer is sent', () {
+    final payload = Uint8List.fromList(List.generate(64, (i) => i));
+    const signer = AppConstants.debugTestAddress;
+
+    test('is the payload addressed to the account that must sign it', () {
+      // UR framing is the SDK's and tested there; what this app contributes is
+      // the envelope, which used to be absent — the payload went out bare, and
+      // the signer had to guess which of its accounts the request was for.
+      final decoded = SigningRequest.decode(signRequestBytes(signer: signer, payload: payload));
+
+      expect(decoded.signer, signer);
+      expect(decoded.payload, payload);
+    });
+
+    test('is not the bare payload, which the signer refuses', () {
+      expect(() => SigningRequest.decode(payload), throwsA(isA<FormatException>()));
     });
   });
 }

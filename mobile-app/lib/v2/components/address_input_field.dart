@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 /// Dual-state address input shared by every flow where the user enters a
 /// destination address (send, redeem, ...). When the controller holds a valid
@@ -35,78 +33,65 @@ class AddressInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+    final hiddenSafeTrailing = hasValid && trailing != null ? ExcludeFocus(child: trailing!) : trailing;
 
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        children: [
+    return Stack(
+      children: [
+        IgnorePointer(
+          ignoring: hasValid,
+          child: Opacity(
+            opacity: hasValid ? 0 : 1,
+            child: QuantusTextField(
+              key: fieldKey,
+              controller: controller,
+              focusNode: focusNode,
+              hint: hintText,
+              trailing: hiddenSafeTrailing,
+              autocorrect: false,
+              enableSuggestions: false,
+              keyboardType: TextInputType.text,
+              textInputAction: TextInputAction.done,
+            ),
+          ),
+        ),
+        if (hasValid)
           Positioned.fill(
-            child: IgnorePointer(
-              ignoring: hasValid,
-              child: Opacity(
-                opacity: hasValid ? 0 : 1,
-                child: Container(
-                  padding: const EdgeInsets.only(left: 12, right: 8),
-                  decoration: BoxDecoration(color: colors.sheetBackground, borderRadius: BorderRadius.circular(8)),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          key: fieldKey,
-                          controller: controller,
-                          focusNode: focusNode,
-                          keyboardType: TextInputType.text,
-                          textInputAction: TextInputAction.done,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          textCapitalization: TextCapitalization.none,
-                          scrollPadding: const EdgeInsets.only(bottom: 120),
-                          style: text.smallParagraph?.copyWith(color: colors.textPrimary),
-                          decoration: InputDecoration(hintText: hintText),
-                        ),
+            child: GestureDetector(
+              onTap: () {
+                controller.clear();
+                focusNode.requestFocus();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: colors.bgSurface,
+                  borderRadius: context.radiusV3.mdBorder,
+                  border: Border.all(color: colors.borderHairline),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      AddressFormattingService.formatAddress(
+                        controller.text.trim(),
+                        prefix: addressPrefix,
+                        postFix: addressPostfix,
                       ),
-                      ?trailing,
-                    ],
-                  ),
+                      style: text.dataAddressLarge.copyWith(color: colors.textContent),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (recipientChecksum != null)
+                      Text(recipientChecksum!, style: text.body.copyWith(color: colors.semanticLilac)),
+                  ],
                 ),
               ),
             ),
           ),
-          if (hasValid)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () {
-                  controller.clear();
-                  focusNode.requestFocus();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(color: colors.toasterBackground, borderRadius: BorderRadius.circular(8)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        AddressFormattingService.formatAddress(
-                          controller.text.trim(),
-                          prefix: addressPrefix,
-                          postFix: addressPostfix,
-                        ),
-                        style: text.smallParagraph?.copyWith(color: colors.textPrimary, fontWeight: FontWeight.w500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (recipientChecksum != null)
-                        Text(recipientChecksum!, style: text.detail?.copyWith(color: colors.checksum)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      ],
     );
   }
 }

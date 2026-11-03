@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:quantus_sdk/quantus_sdk.dart';
 import 'package:resonance_network_wallet/providers/currency_display_provider.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_icon_button.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
+
+/// Placeholder rendered in place of an amount the screen has chosen to hide.
+const String hiddenAmountText = '-----';
 
 class AmountDisplayWithConversion extends StatelessWidget {
   final CurrencyDisplayState amountDisplay;
@@ -12,7 +12,11 @@ class AmountDisplayWithConversion extends StatelessWidget {
   final CrossAxisAlignment alignment;
   final bool colorizeAmount;
   final Color? amountColor;
-  final bool useQuanLogo;
+  final bool useTokenLogo;
+
+  /// Masks both amounts with [hiddenAmountText]. Owned by the screen that
+  /// offers the hide toggle — never read from a global setting here.
+  final bool isHidden;
 
   const AmountDisplayWithConversion({
     super.key,
@@ -21,23 +25,24 @@ class AmountDisplayWithConversion extends StatelessWidget {
     this.alignment = CrossAxisAlignment.center,
     this.colorizeAmount = false,
     this.amountColor,
-    this.useQuanLogo = false,
+    this.useTokenLogo = false,
+    this.isHidden = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final text = context.themeText;
-    final colors = context.colors;
+    final text = context.themeTextV3;
+    final colors = context.colorsV3;
 
-    final primaryAmountColor = amountColor ?? (colorizeAmount ? colors.success : colors.textPrimary);
-    final quanLogoPrimarySize = 32.0;
+    final primaryAmountColor = amountColor ?? (colorizeAmount ? colors.semanticSage : colors.textContent);
+    const tokenLogoPrimarySize = 32.0;
 
-    final secondaryAmountColor = colors.textTertiary;
-    final secondaryAmountBaseStyle = text.paragraph?.copyWith(
-      color: secondaryAmountColor,
-      fontFamily: AppTextTheme.fontFamilySecondary,
-    );
-    final quanLogoSecondarySize = 12.0;
+    final primaryAmount = isHidden ? hiddenAmountText : amountDisplay.primaryAmount;
+    final secondaryAmount = isHidden ? hiddenAmountText : amountDisplay.secondaryAmount;
+
+    final secondaryAmountColor = colors.textMuted;
+    final secondaryAmountBaseStyle = text.body.copyWith(color: secondaryAmountColor);
+    const tokenLogoSecondarySize = 12.0;
 
     final MainAxisAlignment mainAxisAlignment = switch (alignment) {
       CrossAxisAlignment.center => MainAxisAlignment.center,
@@ -50,12 +55,12 @@ class AmountDisplayWithConversion extends StatelessWidget {
         Row(
           mainAxisAlignment: mainAxisAlignment,
           children: [
-            if (useQuanLogo && !amountDisplay.isFlipped) ...[
+            if (useTokenLogo && !amountDisplay.isFlipped) ...[
               SvgPicture.asset(
                 'assets/v2/uppercase_q.svg',
-                width: quanLogoPrimarySize,
-                height: quanLogoPrimarySize,
-                colorFilter: ColorFilter.mode(context.colors.textPrimary, BlendMode.srcIn),
+                width: tokenLogoPrimarySize,
+                height: tokenLogoPrimarySize,
+                colorFilter: ColorFilter.mode(colors.textContent, BlendMode.srcIn),
               ),
               const SizedBox(width: 4),
             ],
@@ -63,17 +68,14 @@ class AmountDisplayWithConversion extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: amountDisplay.primaryAmount,
-                    style: text.conversionAmountPrimary?.copyWith(color: primaryAmountColor),
+                    text: primaryAmount,
+                    style: text.displayBalance.copyWith(color: primaryAmountColor),
                   ),
-                  if (!useQuanLogo && !amountDisplay.isFlipped) ...[
-                    const TextSpan(text: '     '),
+                  if (!useTokenLogo && !amountDisplay.isFlipped) ...[
+                    const TextSpan(text: ' '),
                     TextSpan(
                       text: AppConstants.tokenSymbol,
-                      style: text.mediumTitle?.copyWith(
-                        fontFamily: AppTextTheme.fontFamilySecondary,
-                        color: primaryAmountColor,
-                      ),
+                      style: text.amountHero.copyWith(color: primaryAmountColor),
                     ),
                   ],
                 ],
@@ -81,22 +83,22 @@ class AmountDisplayWithConversion extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Row(
           mainAxisAlignment: mainAxisAlignment,
           children: [
-            if (useQuanLogo && amountDisplay.isFlipped) ...[
+            if (useTokenLogo && amountDisplay.isFlipped) ...[
               Text('≈ ', style: secondaryAmountBaseStyle),
               SvgPicture.asset(
                 'assets/v2/uppercase_q.svg',
-                width: quanLogoSecondarySize,
-                height: quanLogoSecondarySize,
+                width: tokenLogoSecondarySize,
+                height: tokenLogoSecondarySize,
                 colorFilter: ColorFilter.mode(secondaryAmountColor, BlendMode.srcIn),
               ),
               const SizedBox(width: 2),
-              Text(amountDisplay.secondaryAmount, style: secondaryAmountBaseStyle),
+              Text(secondaryAmount, style: secondaryAmountBaseStyle),
             ] else
-              Text('≈ ${amountDisplay.secondaryAmount}', style: secondaryAmountBaseStyle),
+              Text('≈ $secondaryAmount', style: secondaryAmountBaseStyle),
             if (onFlip != null) ...[
               const SizedBox(width: 8),
               QuantusIconButton.circular(

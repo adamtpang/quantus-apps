@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 /// Slider for choosing how many signer approvals a multisig proposal needs.
 class MultisigThresholdSlider extends StatelessWidget {
@@ -22,39 +20,32 @@ class MultisigThresholdSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final maxThreshold = signerCount < 1 ? 1 : signerCount;
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: colors.surfaceDeep, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: colors.bgSurface, borderRadius: context.radiusV3.mdBorder),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(label, style: text.receiveLabel?.copyWith(color: colors.textLabel)),
+                child: Text(label, style: text.labelData.copyWith(color: colors.textMuted)),
               ),
-              Text(
-                valueLabel,
-                style: text.paragraph?.copyWith(
-                  color: colors.accentOrange,
-                  fontFamily: AppTextTheme.fontFamilySecondary,
-                ),
-              ),
+              Text(valueLabel, style: text.labelData.copyWith(color: colors.accentFlare)),
             ],
           ),
           const SizedBox(height: 12),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              activeTrackColor: colors.accentOrange,
-              inactiveTrackColor: colors.borderButton,
-              thumbColor: colors.accentOrange,
-              overlayColor: colors.accentOrange.useOpacity(0.12),
-              trackHeight: 4,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              activeTrackColor: colors.accentFlare,
+              inactiveTrackColor: colors.borderHairline,
+              thumbColor: colors.accentFlare,
+              overlayColor: colors.accentFlare.useOpacity(0.15),
+              trackHeight: 2,
             ),
             child: Slider(
               value: threshold.toDouble(),

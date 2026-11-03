@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quantus_sdk/quantus_sdk.dart';
 import 'package:resonance_network_wallet/shared/utils/account_utils.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 class AccountBadge extends StatelessWidget {
   final String name;
@@ -23,20 +21,24 @@ class AccountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final foreground = isActive ? colors.accentOrange : colors.textLabel;
-    final effectiveTextStyle = textStyle ?? context.themeText.transactionDetailRowValue?.copyWith(letterSpacing: -0.25);
+    final colors = context.colorsV3;
+    final foreground = isActive ? colors.accentFlare : colors.textMuted;
+    final effectiveTextStyle = textStyle ?? context.themeTextV3.labelMonogram;
 
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: colors.sheetBackground, borderRadius: BorderRadius.circular(size / 2)),
+      decoration: BoxDecoration(
+        color: colors.bgSurface2,
+        borderRadius: BorderRadius.circular(size / 2),
+        border: Border.all(color: colors.borderHairline),
+      ),
       child: icon != null
           ? Icon(icon, size: size * 0.5, color: foreground)
           : Text(
               getAccountBadgeInitials(name, separator: ' '),
-              style: effectiveTextStyle?.copyWith(color: foreground),
+              style: effectiveTextStyle.copyWith(color: foreground),
             ),
     );
   }

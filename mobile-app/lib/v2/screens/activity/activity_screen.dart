@@ -1,19 +1,16 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
-import 'package:resonance_network_wallet/features/components/skeleton.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
+import 'package:resonance_network_wallet/v2/components/skeleton.dart';
 import 'package:resonance_network_wallet/l10n/app_localizations.dart';
 import 'package:resonance_network_wallet/providers/account_providers.dart';
 import 'package:resonance_network_wallet/providers/active_account_transactions_provider.dart';
 import 'package:resonance_network_wallet/providers/currency_display_provider.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
+import 'package:resonance_network_wallet/providers/wallet_providers.dart';
 import 'package:resonance_network_wallet/services/transaction_service.dart';
-import 'package:resonance_network_wallet/v2/components/loader.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 import 'package:resonance_network_wallet/v2/screens/activity/tx_item.dart';
 import 'package:resonance_network_wallet/v2/screens/activity/transaction_detail_sheet.dart';
 
@@ -66,8 +63,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
     final appLocale = ref.watch(selectedAppLocaleProvider);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final accountAsync = ref.watch(activeAccountProvider);
     final txAsync = ref.watch(activeAccountTransactionsProvider(_filterOption));
     final pagination = ref.watch(activeAccountPaginationProvider(_filterOption));
@@ -78,11 +75,16 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       mainContent: accountAsync.when(
         loading: () => const Center(child: Loader()),
         error: (e, _) => Center(
-          child: Text(l10n.activityError(e.toString()), style: text.detail?.copyWith(color: colors.textError)),
+          child: Text(l10n.activityError(e.toString()), style: text.caption.copyWith(color: colors.semanticEmber)),
         ),
         data: (active) {
           if (active == null) {
-            return Center(child: Text(l10n.activityNoAccount));
+            return Center(
+              child: Text(l10n.activityNoAccount, style: text.body.copyWith(color: colors.textMuted)),
+            );
+          }
+          if (isEncryptedAccount(active.account)) {
+            return _buildEncryptedActivitySummary(active.account as Account, colors, text, l10n);
           }
           return txAsync.when(
             loading: () => ListView.builder(
@@ -95,13 +97,13 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   const SizedBox(height: 12),
                   for (var j = 0; j < 3; j++) ...[
                     const TxItemSkeleton(),
-                    if (j < 2) Divider(color: colors.txItemSeparator, height: 24),
+                    if (j < 2) Divider(color: colors.borderHairline, height: 24),
                   ],
                 ],
               ),
             ),
             error: (e, _) => Center(
-              child: Text(l10n.activityError(e.toString()), style: text.detail?.copyWith(color: colors.textError)),
+              child: Text(l10n.activityError(e.toString()), style: text.caption.copyWith(color: colors.semanticEmber)),
             ),
             data: (data) {
               final txService = ref.read(transactionServiceProvider);
@@ -125,10 +127,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                         ConstrainedBox(
                           constraints: BoxConstraints(minHeight: constraints.maxHeight),
                           child: Center(
-                            child: Text(
-                              l10n.activityEmpty,
-                              style: text.paragraph?.copyWith(color: colors.textSecondary),
-                            ),
+                            child: Text(l10n.activityEmpty, style: text.bodyLarge.copyWith(color: colors.textMuted)),
                           ),
                         ),
                       ],
@@ -158,19 +157,24 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (i > 0) const SizedBox(height: 32),
-                        Text(group.label, style: text.receiveLabel?.copyWith(color: colors.textTertiary)),
+                        Text(group.label, style: text.headingRow.copyWith(color: colors.textMuted)),
                         ...group.transactions.mapIndexed((index, tx) {
-                          final itemData = TxItemData.from(tx, active.account.accountId, colors, l10n);
+                          final itemData = TxItemData.from(
+                            tx,
+                            active.account.accountId,
+                            colors,
+                            l10n,
+                            isPrivate: isEncryptedAccount(active.account),
+                          );
                           final isLastItem = index == group.transactions.length - 1;
                           return buildTxItem(
                             tx,
                             itemData,
                             colors,
                             text,
+                            context.radiusV3,
                             l10n,
-                            formattedAmount: itemData.hideAmount
-                                ? '—'
-                                : formatTxAmount(itemData.amount, isSend: itemData.isSend).primaryAmount,
+                            formattedAmount: txItemAmountText(itemData, formatTxAmount),
                             isLastItem: isLastItem,
                             onTap: () {
                               showTransactionDetailSheet(context, tx, active.account.accountId);
@@ -189,11 +193,49 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     );
   }
 
+  Widget _buildEncryptedActivitySummary(
+    Account account,
+    AppColorsV3 colors,
+    AppTextThemeV3 text,
+    AppLocalizations l10n,
+  ) {
+    final fmt = ref.watch(numberFormattingServiceProvider);
+    final received = ref.watch(encryptedTotalReceivedProvider(account.walletIndex));
+    final spent = ref.watch(encryptedTotalSpentProvider(account.walletIndex));
+
+    String formatAmount(AsyncValue<BigInt> value) =>
+        value.whenOrNull(data: (v) => fmt.formatBalance(v, maxDecimals: 2, addSymbol: true)) ?? '—';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        children: [
+          _encryptedSummaryRow(l10n.activityPrivateTotalReceived, formatAmount(received), colors, text),
+          Divider(color: colors.borderHairline, height: 24),
+          _encryptedSummaryRow(l10n.activityPrivateTotalSent, formatAmount(spent), colors, text),
+        ],
+      ),
+    );
+  }
+
+  Widget _encryptedSummaryRow(String label, String amount, AppColorsV3 colors, AppTextThemeV3 text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: text.body.copyWith(color: colors.textMuted)),
+          Text(amount, style: text.body.copyWith(color: colors.textContent)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRefreshableContent({required Widget child}) {
     return RefreshIndicator(
       onRefresh: _refresh,
-      color: context.colors.textPrimary,
-      backgroundColor: context.colors.surface,
+      color: context.colorsV3.textContent,
+      backgroundColor: context.colorsV3.bgSurface,
       child: child,
     );
   }
@@ -203,7 +245,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final Map<String, String> labelMap = {};
 
     for (final tx in transactions) {
-      final day = DateTime(tx.timestamp.year, tx.timestamp.month, tx.timestamp.day);
+      final local = tx.timestamp.toLocal();
+      final day = DateTime(local.year, local.month, local.day);
       final key = '${day.year}-${day.month}-${day.day}';
       groups.putIfAbsent(key, () => []);
       groups[key]!.add(tx);

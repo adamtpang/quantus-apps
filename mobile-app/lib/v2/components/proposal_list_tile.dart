@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide DecodedCallView;
 import 'package:resonance_network_wallet/providers/currency_display_provider.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
+import 'package:resonance_network_wallet/v2/components/decoded_call_view.dart';
 
 /// Shared card layout for indexed and pending multisig proposal rows.
 class ProposalListTile extends ConsumerWidget {
@@ -14,6 +13,14 @@ class ProposalListTile extends ConsumerWidget {
   final VoidCallback? onTap;
   final bool highlighted;
 
+  /// The proposal's decoded call, when the indexer supplied its bytes.
+  ///
+  /// Proposals are not always transfers, so when this is present the row names
+  /// the actual call instead of rendering a non-transfer as "0 tokens to ''".
+  final DecodedCall? call;
+
+  final bool callUndecodable;
+
   const ProposalListTile({
     super.key,
     required this.amount,
@@ -21,24 +28,36 @@ class ProposalListTile extends ConsumerWidget {
     required this.trailing,
     this.onTap,
     this.highlighted = false,
+    this.call,
+    this.callUndecodable = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
-    final amountText = ref.watch(txAmountDisplayProvider)(amount, isSend: true).primaryAmount;
-    final shortAddr = AddressFormattingService.formatAddress(recipientAddress);
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
+    final formatAmount = ref.watch(txAmountDisplayProvider);
+    final decoded = call;
+    final headline = decoded == null
+        ? null
+        : DecodedCallHeadline.of(decoded, amountText: (token) => formatAmount(token, isSend: true).primaryAmount);
+    final amountText = callUndecodable
+        ? l10n.multisigProposalInvalid
+        : (headline?.primary ?? formatAmount(amount, isSend: true).primaryAmount);
+    final recipient = headline == null
+        ? (recipientAddress.isEmpty ? null : AddressFormattingService.formatAddress(recipientAddress))
+        : headline.recipient;
+    final subtitle = callUndecodable
+        ? null
+        : (recipient != null ? l10n.multisigProposalToAddress(recipient) : headline?.palletSubtitle);
 
     final content = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colors.surfaceDeep,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: highlighted ? colors.txItemOutgoingHighlightBorder : colors.borderButton.useOpacity(0.4),
-        ),
+        color: colors.bgSurface,
+        borderRadius: context.radiusV3.mdBorder,
+        border: Border.all(color: highlighted ? colors.semanticGlacier.useOpacity(0.15) : colors.borderHairline),
       ),
       child: Row(
         children: [
@@ -48,20 +67,12 @@ class ProposalListTile extends ConsumerWidget {
               children: [
                 Text(
                   amountText,
-                  style: text.paragraph?.copyWith(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: AppTextTheme.fontFamilySecondary,
-                  ),
+                  style: text.amountRow.copyWith(color: callUndecodable ? colors.semanticEmber : colors.textContent),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.multisigProposalToAddress(shortAddr),
-                  style: text.detail?.copyWith(
-                    color: colors.textTertiary,
-                    fontFamily: AppTextTheme.fontFamilySecondary,
-                  ),
-                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: text.caption.copyWith(color: colors.textMuted)),
+                ],
               ],
             ),
           ),
@@ -73,10 +84,7 @@ class ProposalListTile extends ConsumerWidget {
 
     if (onTap == null) return content;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), child: content),
-    );
+    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: content);
   }
 }
 
@@ -90,18 +98,15 @@ class PendingProposalRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
 
     return ProposalListTile(
       amount: pending.amount,
       recipientAddress: pending.recipient,
       highlighted: true,
       onTap: onTap,
-      trailing: Text(
-        l10n.activityTxProposing,
-        style: text.detail?.copyWith(color: colors.checksum, fontWeight: FontWeight.w600, letterSpacing: 0.4),
-      ),
+      trailing: Text(l10n.activityTxProposing, style: text.labelChip.copyWith(color: colors.semanticGlacier)),
     );
   }
 }

@@ -12,61 +12,6 @@
       "description": "Label for the button on the error dialog when the wallet is not found"
     },
 
-    "migrationDialogTitle": "Migrate your accounts",
-    "@migrationDialogTitle": {
-      "description": "Title of the account migration dialog"
-    },
-    "migrationDialogBody": "We'll record your old\u2011chain testnet rewards and actions to determine rewards on the new Quantus Testnet.\n\nBalances do not migrate.\n\nUse the new testnet faucet for funds.",
-    "@migrationDialogBody": {
-      "description": "Body text of the account migration dialog"
-    },
-    "migrationDialogAccountsToMigrate": "{count, plural, =1{1 Account to migrate.} other{{count} Accounts to migrate.}}",
-    "@migrationDialogAccountsToMigrate": {
-      "description": "Number of accounts that will be migrated",
-      "placeholders": {
-        "count": {
-          "type": "int"
-        }
-      }
-    },
-    "migrationDialogAccountsCannotMigrate": "{count, plural, =1{1 account cannot be migrated (missing wallet data).} other{{count} accounts cannot be migrated (missing wallet data).}}",
-    "@migrationDialogAccountsCannotMigrate": {
-      "description": "Number of accounts that cannot be migrated",
-      "placeholders": {
-        "count": {
-          "type": "int"
-        }
-      }
-    },
-    "migrationDialogUploadError": "We couldn't upload migration data. Please retry or try later.",
-    "@migrationDialogUploadError": {
-      "description": "Error shown in the migration dialog when the upload fails"
-    },
-    "migrationDialogMigrate": "Migrate Accounts",
-    "@migrationDialogMigrate": {
-      "description": "Label for the migrate button in the migration dialog"
-    },
-    "migrationDialogRetry": "Retry",
-    "@migrationDialogRetry": {
-      "description": "Label for the retry button in the migration dialog"
-    },
-    "migrationDialogTryLater": "Try later",
-    "@migrationDialogTryLater": {
-      "description": "Label for the try-later button in the migration dialog"
-    },
-    "migrationDialogSkip": "Skip",
-    "@migrationDialogSkip": {
-      "description": "Label for the skip button in the migration dialog when no accounts can be migrated"
-    },
-    "migrationPartialFailureToast": "{count, plural, =1{1 account could not be migrated. Migration will retry on next app launch.} other{{count} accounts could not be migrated. Migration will retry on next app launch.}}",
-    "@migrationPartialFailureToast": {
-      "description": "Toast shown when some accounts failed to migrate",
-      "placeholders": {
-        "count": {
-          "type": "int"
-        }
-      }
-    },
 
     "authUseDeviceBiometricsToUnlock": "Use device biometrics to unlock",
     "@authUseDeviceBiometricsToUnlock": {
@@ -161,6 +106,22 @@
     "@accountReadyDone": {
       "description": "Done button on the account ready screen"
     },
+    "accountReadyTwoAccountsCreated": "Two accounts were created for you.",
+    "@accountReadyTwoAccountsCreated": {
+      "description": "Subtitle on wallet created ready screen explaining the two accounts"
+    },
+    "accountReadyMainAccountDescription": "Your main account. Fast, visible on chain.",
+    "@accountReadyMainAccountDescription": {
+      "description": "Description under the transparent main account card after wallet creation"
+    },
+    "accountReadyEncryptedAccountDescription": "For private transactions. Shielded, slower.",
+    "@accountReadyEncryptedAccountDescription": {
+      "description": "Description under the encrypted account card after wallet creation"
+    },
+    "accountReadyGoToWallet": "Go to Wallet",
+    "@accountReadyGoToWallet": {
+      "description": "Primary CTA on the wallet created ready screen"
+    },
 
     "importWalletAppBarTitle": "Import Wallet",
     "@importWalletAppBarTitle": {
@@ -196,10 +157,6 @@
     "@homeNoActiveAccount": {
       "description": "Shown when no account is active on the home screen"
     },
-    "homeCharge": "Charge",
-    "@homeCharge": {
-      "description": "POS charge button on the home screen bottom bar"
-    },
     "homeGetTestnetTokens": "Get Testnet Tokens ↗",
     "@homeGetTestnetTokens": {
       "description": "Faucet button when balance is zero on the home screen"
@@ -211,6 +168,10 @@
     "homeBackupReminder": "Back up your recovery phrase",
     "@homeBackupReminder": {
       "description": "Home banner prompting the user to back up their recovery phrase"
+    },
+    "networkStatusOfflineBanner": "Offline · showing last known balances",
+    "@networkStatusOfflineBanner": {
+      "description": "Full-width strip shown when the device is offline; rendered uppercase"
     },
     "homeReceive": "Receive",
     "@homeReceive": {
@@ -245,9 +206,14 @@
     "@homeActivityEmptyTitle": {
       "description": "Empty state title in home activity section"
     },
-    "homeActivityEmptyMessage": "Your activity will appear here once you send or receive QUAN.",
+    "homeActivityEmptyMessage": "Your activity will appear here once you send or receive {tokenSymbol}.",
     "@homeActivityEmptyMessage": {
-      "description": "Empty state message in home activity section"
+      "description": "Empty state message in home activity section",
+      "placeholders": {
+        "tokenSymbol": {
+          "type": "String"
+        }
+      }
     },
 
     "accountsSheetTitle": "Accounts",
@@ -304,21 +270,30 @@
         }
       }
     },
-    "accountsSheetSubheaderTransparent": "Transparent Accounts",
-    "@accountsSheetSubheaderTransparent": {
-      "description": "Sub-segment header for transparent accounts"
+    "accountsScreenActiveWallet": "Active Wallet",
+    "@accountsScreenActiveWallet": {
+      "description": "Badge on the wallet header containing the active account; rendered uppercase"
     },
-    "accountsSheetSubheaderEncrypted": "Encrypted Account",
-    "@accountsSheetSubheaderEncrypted": {
-      "description": "Sub-segment header for the encrypted account"
+    "accountsScreenAccountCount": "{count, plural, =1{1 Account} other{{count} Accounts}}",
+    "@accountsScreenAccountCount": {
+      "description": "Account count on a collapsed wallet row",
+      "placeholders": {
+        "count": {
+          "type": "int"
+        }
+      }
     },
-    "accountsSheetSubheaderKeystone": "Keystone Accounts",
-    "@accountsSheetSubheaderKeystone": {
-      "description": "Sub-segment header for keystone accounts"
+    "walletNameTitle": "Wallet Name",
+    "@walletNameTitle": {
+      "description": "App bar title of the wallet naming screen"
     },
-    "accountsSheetSubheaderMultisig": "Multisig Accounts",
-    "@accountsSheetSubheaderMultisig": {
-      "description": "Sub-segment header for multisig accounts"
+    "walletNameSubtitle": "Naming your wallets makes it easier to tell their accounts apart. Each wallet has its own encrypted account.",
+    "@walletNameSubtitle": {
+      "description": "Explainer text on the wallet naming screen"
+    },
+    "walletNameHint": "Enter a name for your wallet",
+    "@walletNameHint": {
+      "description": "Placeholder of the wallet name field"
     },
 
     "addAccountMenuTitle": "Add Account",
@@ -337,7 +312,7 @@
     "@addAccountMenuMoreTitle": {
       "description": "Title of the add account more options action sheet"
     },
-    "addAccountMenuImportKeystoneTitle": "Add Keystone Account",
+    "addAccountMenuImportKeystoneTitle": "Add Keystone Wallet",
     "@addAccountMenuImportKeystoneTitle": {
       "description": "Add keystone hardware account menu row title"
     },
@@ -554,6 +529,18 @@
           "type": "String"
         }
       }
+    },
+    "multisigProposalCallLoading": "Reading the proposal from the chain…",
+    "@multisigProposalCallLoading": {
+      "description": "Shown while the proposal's stored call bytes are being fetched before approving"
+    },
+    "multisigProposalCallUnavailable": "Could not read this proposal from the chain, so there is nothing to approve. Try again when you are back online.",
+    "@multisigProposalCallUnavailable": {
+      "description": "Shown when the proposal's stored call bytes could not be fetched, blocking approval"
+    },
+    "multisigProposalInvalid": "Invalid proposal",
+    "@multisigProposalInvalid": {
+      "description": "Shown in place of the amount when the proposal's stored call bytes cannot be decoded, blocking approval"
     },
     "multisigStatusApproved": "SIGNED",
     "@multisigStatusApproved": {
@@ -1118,6 +1105,10 @@
     "@accountMenuAddressDetails": {
       "description": "Address details menu row label"
     },
+    "accountMenuInnerHash": "Inner Hash",
+    "@accountMenuInnerHash": {
+      "description": "Menu row label shown for encrypted accounts instead of address details"
+    },
     "accountMenuShowRecoveryPhrase": "Show Recovery Phrase",
     "@accountMenuShowRecoveryPhrase": {
       "description": "Show recovery phrase menu row label"
@@ -1225,45 +1216,83 @@
       "description": "App bar title on account details screen"
     },
 
-    "addHardwareAccountAddWallet": "Add Hardware Wallet",
-    "@addHardwareAccountAddWallet": {
-      "description": "Title when adding a new hardware wallet"
+    "innerHashTitle": "Inner Hash",
+    "@innerHashTitle": {
+      "description": "App bar title on the encrypted account inner hash screen"
     },
-    "addHardwareAccountAddAccount": "Add Hardware Account",
-    "@addHardwareAccountAddAccount": {
-      "description": "Title when adding a hardware account to existing wallet"
+    "innerHashLabel": "INNER HASH",
+    "@innerHashLabel": {
+      "description": "Card label above the inner hash value"
     },
-    "addHardwareAccountNameLabel": "NAME",
-    "@addHardwareAccountNameLabel": {
-      "description": "Name field label"
+    "innerHashCopied": "Inner hash copied",
+    "@innerHashCopied": {
+      "description": "Toaster shown after copying the inner hash"
     },
-    "addHardwareAccountNameHintWallet": "Hardware Wallet",
-    "@addHardwareAccountNameHintWallet": {
-      "description": "Name field hint for new hardware wallet"
+    "innerHashLoadError": "Couldn't load inner hash",
+    "@innerHashLoadError": {
+      "description": "Toaster shown when deriving the inner hash fails"
     },
-    "addHardwareAccountNameHintAccount": "Account",
-    "@addHardwareAccountNameHintAccount": {
-      "description": "Name field hint for hardware account"
+
+    "addKeystoneAppBarTitle": "Add Keystone Wallet",
+    "@addKeystoneAppBarTitle": {
+      "description": "App bar title for the add Keystone wallet screens"
     },
-    "addHardwareAccountAddressLabel": "ADDRESS",
-    "@addHardwareAccountAddressLabel": {
-      "description": "Address field label"
+    "addKeystoneIntroTitle": "Keystone Hardware Wallet",
+    "@addKeystoneIntroTitle": {
+      "description": "Headline on the add Keystone intro screen"
     },
-    "addHardwareAccountAddressHint": "Signer address",
-    "@addHardwareAccountAddressHint": {
-      "description": "Address field hint"
+    "addKeystoneIntroSubtitle": "Air-gapped signing for QUAN. Keys stay on the device, signing happens over QR.",
+    "@addKeystoneIntroSubtitle": {
+      "description": "Subtitle on the add Keystone intro screen"
     },
-    "addHardwareAccountDebugFill": "Debug Fill",
-    "@addHardwareAccountDebugFill": {
-      "description": "Debug fill button"
+    "addKeystoneConnectButton": "Connect Hardware Wallet",
+    "@addKeystoneConnectButton": {
+      "description": "Primary button on the add Keystone intro screen"
     },
-    "addHardwareAccountNameRequired": "Name is required",
-    "@addHardwareAccountNameRequired": {
-      "description": "Validation when name is empty"
+    "addKeystoneGetOneLink": "Don't have one? Get a Keystone ↗",
+    "@addKeystoneGetOneLink": {
+      "description": "Link to the Keystone store on the add Keystone intro screen"
     },
-    "addHardwareAccountInvalidAddress": "Invalid address",
-    "@addHardwareAccountInvalidAddress": {
-      "description": "Validation when address is invalid"
+    "addKeystoneConnectTitle": "Connect Hardware Wallet",
+    "@addKeystoneConnectTitle": {
+      "description": "Headline on the Keystone connect instructions screen"
+    },
+    "addKeystoneConnectSubtitle": "Scan your device's QR code to connect.",
+    "@addKeystoneConnectSubtitle": {
+      "description": "Subtitle on the Keystone connect instructions screen"
+    },
+    "addKeystoneBeforeYouStart": "BEFORE YOU START",
+    "@addKeystoneBeforeYouStart": {
+      "description": "Section label on the Keystone connect instructions screen"
+    },
+    "addKeystoneFirmwareTitle": "Update to the latest Keystone firmware",
+    "@addKeystoneFirmwareTitle": {
+      "description": "Firmware reminder title on the Keystone connect instructions screen"
+    },
+    "addKeystoneFirmwareSubtitle": "Required for QUAN signing",
+    "@addKeystoneFirmwareSubtitle": {
+      "description": "Firmware reminder subtitle on the Keystone connect instructions screen"
+    },
+    "addKeystoneOnYourKeystone": "ON YOUR KEYSTONE",
+    "@addKeystoneOnYourKeystone": {
+      "description": "Section label for the on-device steps"
+    },
+    "addKeystoneStepUnlock": "Unlock your Keystone",
+    "@addKeystoneStepUnlock": {
+      "description": "On-device step: unlock"
+    },
+    "addKeystoneStepSelectQuantus": "Select Quantus and scan the QR code",
+    "@addKeystoneStepSelectQuantus": {
+      "description": "On-device step: select Quantus and scan"
+    },
+    "addKeystoneReadyToScan": "Ready to Scan",
+    "@addKeystoneReadyToScan": {
+      "description": "Primary button opening the QR scanner on the Keystone connect instructions screen"
+    },
+
+    "invalidAddress": "Invalid address",
+    "@invalidAddress": {
+      "description": "Shown when an address fails SS58 validation"
     },
 
     "sendTitle": "Send",
@@ -1375,6 +1404,10 @@
     "@sendReviewSubmitFailed": {
       "description": "Error when transaction submission fails"
     },
+    "sendRegularAccountRequired": "Switch to a regular account to send",
+    "@sendRegularAccountRequired": {
+      "description": "Toast when a send is requested while the active account cannot make regular transfers"
+    },
 
     "sendTxSubmittedHeadlinePaid": "{amount} {symbol} paid",
     "@sendTxSubmittedHeadlinePaid": {
@@ -1413,27 +1446,75 @@
       "description": "Done button on transaction submitted screen"
     },
 
+    "keystoneSignScreenTitle": "Sign with Keystone",
+    "@keystoneSignScreenTitle": {
+      "description": "App bar title shared by the Keystone signing screens"
+    },
+    "keystoneSignStep": "STEP {current}/{total}",
+    "@keystoneSignStep": {
+      "description": "Step indicator on the Keystone signing screens",
+      "placeholders": {
+        "current": {
+          "type": "int"
+        },
+        "total": {
+          "type": "int"
+        }
+      }
+    },
     "keystoneSignTitle": "Scan with your Keystone",
     "@keystoneSignTitle": {
       "description": "Title on the Keystone sign screen showing the unsigned transaction QR"
     },
-    "keystoneSignInstruction": "Show this QR code to your Keystone hardware wallet to sign the transaction.",
+    "keystoneSignInstruction": "Open your Keystone and scan this QR code to load the transaction.",
     "@keystoneSignInstruction": {
       "description": "Instruction on the Keystone sign screen"
     },
-    "keystoneSignNext": "Scan signature",
+    "keystoneSignYouAreSigning": "YOU ARE SIGNING",
+    "@keystoneSignYouAreSigning": {
+      "description": "Section label above the transaction details on the Keystone sign screen"
+    },
+    "keystoneSignNext": "Continue to Sign",
     "@keystoneSignNext": {
-      "description": "Button to advance from showing the QR to scanning the signature"
+      "description": "Button to advance to the next Keystone signing step"
+    },
+    "keystoneSignCancel": "Cancel Transaction",
+    "@keystoneSignCancel": {
+      "description": "Link to abort the Keystone signing flow"
     },
     "keystoneSignError": "Failed to prepare the transaction. Please try again.",
     "@keystoneSignError": {
       "description": "Error when building the unsigned transaction payload fails"
     },
-    "keystoneScanInstruction": "Scan the signature QR from your Keystone",
+    "keystoneVerifyTitle": "Check your Keystone Screen",
+    "@keystoneVerifyTitle": {
+      "description": "Title on the Keystone verification screen"
+    },
+    "keystoneVerifyInstruction": "Before approving on your Keystone, make sure its screen shows exactly this:",
+    "@keystoneVerifyInstruction": {
+      "description": "Instruction on the Keystone verification screen"
+    },
+    "keystoneVerifyWarning": "If the amount or address on your Keystone screen is different from what's shown here, reject the transaction on your device.",
+    "@keystoneVerifyWarning": {
+      "description": "Warning shown when asking the user to compare the Keystone screen"
+    },
+    "keystoneVerifyMismatch": "It doesn't match",
+    "@keystoneVerifyMismatch": {
+      "description": "Link opening the mismatch help screen"
+    },
+    "keystoneScanTitle": "Scan the signature",
+    "@keystoneScanTitle": {
+      "description": "Title on the Keystone signature scanner screen"
+    },
+    "keystoneScanInstruction": "Your Keystone is now showing an animated QR. Hold your phone up to it, this takes a moment.",
     "@keystoneScanInstruction": {
       "description": "Instruction on the Keystone signature scanner screen"
     },
-    "keystoneScanProgress": "{scanned} / {total} frames",
+    "keystoneScanReceiving": "RECEIVING SIGNATURE",
+    "@keystoneScanReceiving": {
+      "description": "Label next to the scan progress on the Keystone signature scanner screen"
+    },
+    "keystoneScanProgress": "{scanned}/{total}",
     "@keystoneScanProgress": {
       "description": "Progress indicator showing scanned vs total animated QR frames",
       "placeholders": {
@@ -1462,6 +1543,46 @@
     "@keystoneScanError": {
       "description": "Error when decoding or submitting the scanned signature fails"
     },
+    "keystoneScanExpired": "The transaction expired before it could be submitted. Go back and scan the new QR code with your device.",
+    "@keystoneScanExpired": {
+      "description": "Error when the mortal era window closed before the signed transaction was submitted"
+    },
+    "keystoneRejectTitle": "Don't approve this transaction",
+    "@keystoneRejectTitle": {
+      "description": "Headline on the Keystone mismatch help screen"
+    },
+    "keystoneRejectStep1Title": "Reject the transaction on your Keystone.",
+    "@keystoneRejectStep1Title": {
+      "description": "First step title on the Keystone mismatch help screen"
+    },
+    "keystoneRejectStep1Body": "Nothing is signed or sent until you approve there.",
+    "@keystoneRejectStep1Body": {
+      "description": "First step body on the Keystone mismatch help screen"
+    },
+    "keystoneRejectStep2Title": "Don't retry from this phone.",
+    "@keystoneRejectStep2Title": {
+      "description": "Second step title on the Keystone mismatch help screen"
+    },
+    "keystoneRejectStep2Body": "If it's compromised, retrying gives the attacker another chance.",
+    "@keystoneRejectStep2Body": {
+      "description": "Second step body on the Keystone mismatch help screen"
+    },
+    "keystoneRejectStep3Title": "Your funds are safe on the Keystone.",
+    "@keystoneRejectStep3Title": {
+      "description": "Third step title on the Keystone mismatch help screen"
+    },
+    "keystoneRejectStep3Body": "Keys never left the device. Move to a trusted phone before sending again.",
+    "@keystoneRejectStep3Body": {
+      "description": "Third step body on the Keystone mismatch help screen"
+    },
+    "keystoneRejectConfirm": "I rejected it on Keystone",
+    "@keystoneRejectConfirm": {
+      "description": "Button confirming the transaction was rejected on the device"
+    },
+    "keystoneRejectContactSupport": "Contact Support",
+    "@keystoneRejectContactSupport": {
+      "description": "Link to contact support from the Keystone mismatch help screen"
+    },
 
     "sendLogicCantSelfTransfer": "Can't Self Transfer",
     "@sendLogicCantSelfTransfer": {
@@ -1475,9 +1596,17 @@
     "@sendLogicInvalidAmount": {
       "description": "Button label when amount is negative"
     },
-    "sendLogicBelowExistentialDeposit": "Below Existential Deposit",
-    "@sendLogicBelowExistentialDeposit": {
-      "description": "Button label when amount is below existential deposit"
+    "sendLogicBelowMinimum": "Minimum is {amount} {tokenSymbol}",
+    "@sendLogicBelowMinimum": {
+      "description": "Button label when amount is below the minimum send amount (one wormhole leaf quantum)",
+      "placeholders": {
+        "amount": {
+          "type": "String"
+        },
+        "tokenSymbol": {
+          "type": "String"
+        }
+      }
     },
     "sendLogicInsufficientBalance": "Insufficient Balance",
     "@sendLogicInsufficientBalance": {
@@ -1508,6 +1637,14 @@
     "activityEmpty": "No transactions yet",
     "@activityEmpty": {
       "description": "Empty state on activity screen"
+    },
+    "activityPrivateTotalReceived": "Total Received",
+    "@activityPrivateTotalReceived": {
+      "description": "Label for total received in encrypted account activity summary"
+    },
+    "activityPrivateTotalSent": "Total Sent",
+    "@activityPrivateTotalSent": {
+      "description": "Label for total sent in encrypted account activity summary"
     },
     "activityFilterAll": "All",
     "@activityFilterAll": {
@@ -1549,6 +1686,22 @@
     "activityTxReceived": "Received",
     "@activityTxReceived": {
       "description": "Transaction row label for completed receive"
+    },
+    "activityTxPrivatelySending": "Privately Sending",
+    "@activityTxPrivatelySending": {
+      "description": "Transaction row label for pending encrypted send"
+    },
+    "activityTxPrivatelyReceiving": "Privately Receiving",
+    "@activityTxPrivatelyReceiving": {
+      "description": "Transaction row label for pending encrypted receive"
+    },
+    "activityTxPrivateSent": "Private Sent",
+    "@activityTxPrivateSent": {
+      "description": "Transaction row label for completed encrypted send"
+    },
+    "activityTxPrivateReceived": "Private Received",
+    "@activityTxPrivateReceived": {
+      "description": "Transaction row label for completed encrypted receive"
     },
     "activityTxMultisigCreated": "Multisig created",
     "@activityTxMultisigCreated": {
@@ -1636,6 +1789,22 @@
     "activityDetailTitleReceived": "Received",
     "@activityDetailTitleReceived": {
       "description": "Detail sheet title for completed receive"
+    },
+    "activityDetailTitlePrivatelySending": "Privately Sending",
+    "@activityDetailTitlePrivatelySending": {
+      "description": "Detail sheet title for pending encrypted send"
+    },
+    "activityDetailTitlePrivatelyReceiving": "Privately Receiving",
+    "@activityDetailTitlePrivatelyReceiving": {
+      "description": "Detail sheet title for pending encrypted receive"
+    },
+    "activityDetailTitlePrivateSent": "Private Sent",
+    "@activityDetailTitlePrivateSent": {
+      "description": "Detail sheet title for completed encrypted send"
+    },
+    "activityDetailTitlePrivateReceived": "Private Received",
+    "@activityDetailTitlePrivateReceived": {
+      "description": "Detail sheet title for completed encrypted receive"
     },
     "activityDetailTitleMultisigCreated": "Multisig created",
     "@activityDetailTitleMultisigCreated": {
@@ -1762,14 +1931,6 @@
     "@receiveTitle": {
       "description": "App bar title on receive screen"
     },
-    "receiveTabQrCode": "QR Code",
-    "@receiveTabQrCode": {
-      "description": "QR Code tab on receive screen"
-    },
-    "receiveTabAddress": "Address",
-    "@receiveTabAddress": {
-      "description": "Address tab on receive screen"
-    },
     "receiveCopy": "Copy",
     "@receiveCopy": {
       "description": "Copy button on receive screen"
@@ -1787,100 +1948,20 @@
     "@receiveCopiedMessage": {
       "description": "Toast when the address is copied"
     },
-
-    "posAmountTitle": "New Charge",
-    "@posAmountTitle": {
-      "description": "App bar title on POS amount screen"
+    "receiveYourAddressLabel": "YOUR ADDRESS",
+    "@receiveYourAddressLabel": {
+      "description": "Label above the account address on the receive screen"
     },
-    "posAmountCharge": "Charge {amount}",
-    "@posAmountCharge": {
-      "description": "Charge button with formatted amount",
-      "placeholders": {
-        "amount": {
-          "type": "String"
-        }
-      }
+    "receiveCopyAddress": "Copy Address",
+    "@receiveCopyAddress": {
+      "description": "Primary button that copies the receive address"
     },
-    "posAmountEnterAmount": "Enter Amount",
-    "@posAmountEnterAmount": {
-      "description": "Charge button when amount is empty"
+    "receiveCheckphraseFootnote": "Ask the sender to confirm this phrase matches your address.",
+    "@receiveCheckphraseFootnote": {
+      "description": "Footnote under the checkphrase on the receive screen"
     },
 
-    "posQrTitleScanToPay": "Scan to Pay",
-    "@posQrTitleScanToPay": {
-      "description": "App bar title while waiting for payment"
-    },
-    "posQrTitlePaymentReceived": "Payment Received",
-    "@posQrTitlePaymentReceived": {
-      "description": "App bar title when payment is received"
-    },
-    "posQrError": "Error: {error}",
-    "@posQrError": {
-      "description": "Error message on POS QR screen",
-      "placeholders": {
-        "error": {
-          "type": "String"
-        }
-      }
-    },
-    "posQrNoActiveAccount": "No active account",
-    "@posQrNoActiveAccount": {
-      "description": "Shown when no active account on POS QR screen"
-    },
-    "posQrInvalidAmount": "Invalid amount. Tap to retry.",
-    "@posQrInvalidAmount": {
-      "description": "Error when amount cannot be parsed"
-    },
-    "posQrConnectionLost": "Connection lost. Tap to retry.",
-    "@posQrConnectionLost": {
-      "description": "Error when payment watch connection is lost"
-    },
-    "posQrTimedOut": "Timed out. Tap to retry.",
-    "@posQrTimedOut": {
-      "description": "Error when payment watch times out"
-    },
-    "posQrNewCharge": "New Charge",
-    "@posQrNewCharge": {
-      "description": "New charge button on POS QR screen"
-    },
-    "posQrDone": "Done",
-    "@posQrDone": {
-      "description": "Done button after payment received"
-    },
-    "posQrAmountReceived": "{amount} received",
-    "@posQrAmountReceived": {
-      "description": "Headline when payment is received",
-      "placeholders": {
-        "amount": {
-          "type": "String"
-        }
-      }
-    },
-    "posQrFrom": "From:",
-    "@posQrFrom": {
-      "description": "Sender label on payment received screen"
-    },
-    "posQrWaitingForPayment": "Waiting for payment",
-    "@posQrWaitingForPayment": {
-      "description": "Status while waiting for payment"
-    },
-    "posQrNetworkError": "Network Error",
-    "@posQrNetworkError": {
-      "description": "Network error title on POS QR screen"
-    },
-    "posQrTryAgain": "Try Again",
-    "@posQrTryAgain": {
-      "description": "Retry button on POS QR screen"
-    },
-    "posQrPaidAt": "At {time}",
-    "@posQrPaidAt": {
-      "description": "Paid at timestamp on payment received screen",
-      "placeholders": {
-        "time": {
-          "type": "String"
-        }
-      }
-    },
+
 
     "settingsTitle": "Settings",
     "@settingsTitle": {
@@ -1898,7 +1979,7 @@
     "@settingsPreferencesTitle": {
       "description": "Preferences row title on settings hub"
     },
-    "settingsPreferencesSubtitle": "Language, currency, POS mode, notifications",
+    "settingsPreferencesSubtitle": "Language, currency, notifications",
     "@settingsPreferencesSubtitle": {
       "description": "Preferences row subtitle on settings hub"
     },
@@ -2075,14 +2156,6 @@
     "@settingsPreferencesLanguageSubtitle": {
       "description": "Language row subtitle"
     },
-    "settingsPreferencesPosMode": "POS Mode",
-    "@settingsPreferencesPosMode": {
-      "description": "POS mode row on preferences"
-    },
-    "settingsPreferencesPosModeSubtitle": "Point of sale features",
-    "@settingsPreferencesPosModeSubtitle": {
-      "description": "POS mode row subtitle"
-    },
     "settingsPreferencesNotifications": "Notifications",
     "@settingsPreferencesNotifications": {
       "description": "Notifications row on preferences"
@@ -2176,9 +2249,14 @@
     "@settingsMiningStatRedeemable": {
       "description": "Redeemable rewards stat label"
     },
-    "settingsMiningQuanEarned": "QUAN EARNED",
-    "@settingsMiningQuanEarned": {
-      "description": "QUAN earned stat label"
+    "settingsMiningTokenEarned": "{tokenSymbol} EARNED",
+    "@settingsMiningTokenEarned": {
+      "description": "Token earned stat label",
+      "placeholders": {
+        "tokenSymbol": {
+          "type": "String"
+        }
+      }
     },
     "settingsMiningViewTelemetry": "View Telemetry ↗",
     "@settingsMiningViewTelemetry": {
@@ -2351,7 +2429,7 @@
     "@swapGetQuote": {
       "description": "Get quote button on swap screen"
     },
-    "swapRateLabel": "1 QUAN = {amount} {symbol}",
+    "swapRateLabel": "1 {tokenSymbol} = {amount} {symbol}",
     "@swapRateLabel": {
       "description": "Exchange rate display",
       "placeholders": {
@@ -2360,14 +2438,20 @@
         },
         "symbol": {
           "type": "String"
+        },
+        "tokenSymbol": {
+          "type": "String"
         }
       }
     },
-    "swapRateZero": "1 QUAN = 0 {symbol}",
+    "swapRateZero": "1 {tokenSymbol} = 0 {symbol}",
     "@swapRateZero": {
       "description": "Exchange rate when amount is zero",
       "placeholders": {
         "symbol": {
+          "type": "String"
+        },
+        "tokenSymbol": {
           "type": "String"
         }
       }
@@ -2466,11 +2550,14 @@
     "@swapDepositCompleteTitle": {
       "description": "Title when swap is complete"
     },
-    "swapDepositCompleteBody": "Your swap for {amount} QUAN is complete.",
+    "swapDepositCompleteBody": "Your swap for {amount} {tokenSymbol} is complete.",
     "@swapDepositCompleteBody": {
       "description": "Body when swap is complete",
       "placeholders": {
         "amount": {
+          "type": "String"
+        },
+        "tokenSymbol": {
           "type": "String"
         }
       }
@@ -2478,6 +2565,14 @@
     "swapDepositTestnetBanner": "DEMO ONLY - WE ARE STILL ON TESTNET",
     "@swapDepositTestnetBanner": {
       "description": "Testnet demo banner on deposit screen"
+    },
+    "swapDemoOnly": "Demo Only",
+    "@swapDemoOnly": {
+      "description": "Large banner making clear the swap flow is a demo and nothing is swapped"
+    },
+    "swapDemoOnlyBody": "No real swap was performed.",
+    "@swapDemoOnlyBody": {
+      "description": "Subtitle under the Demo Only banner"
     },
     "swapDepositSentFunds": "I've sent the funds",
     "@swapDepositSentFunds": {
@@ -2525,6 +2620,10 @@
     "@componentNameFieldHint": {
       "description": "Hint text on account name field"
     },
+    "componentAmountApproximatePrefix": "≈",
+    "@componentAmountApproximatePrefix": {
+      "description": "Prefix before a converted secondary amount"
+    },
 
     "commonLoading": "Loading...",
     "@commonLoading": {
@@ -2533,6 +2632,10 @@
     "commonCancel": "Cancel",
     "@commonCancel": {
       "description": "Generic cancel button label"
+    },
+    "commonCanceling": "Canceling...",
+    "@commonCanceling": {
+      "description": "Text shown while a cancellation is in progress"
     },
     "commonAmountBalance": "{balance} {symbol}",
     "@commonAmountBalance": {
@@ -2553,6 +2656,10 @@
     "commonDone": "Done",
     "@commonDone": {
       "description": "Done button on various screens"
+    },
+    "commonTryAgain": "Try Again",
+    "@commonTryAgain": {
+      "description": "Retry label shown when a list or quote fails to load"
     },
 
     "redeemToLabel": "Redeem To",
@@ -2593,9 +2700,14 @@
     "@redeemConfirmFee": {
       "description": "Fee row label on redeem confirmation"
     },
-    "redeemFeeValue": "0.1% volume fee",
+    "redeemFeeValue": "{rate}% volume fee",
     "@redeemFeeValue": {
-      "description": "Volume fee value on redeem confirmation"
+      "description": "Volume fee value on redeem confirmation",
+      "placeholders": {
+        "rate": {
+          "type": "String"
+        }
+      }
     },
     "redeemProgressTitle": "Redeeming...",
     "@redeemProgressTitle": {
@@ -2633,9 +2745,13 @@
     "@redeemStepProofs": {
       "description": "Redeem progress step: generating ZK proofs"
     },
-    "redeemStepAggregate": "Aggregating & submitting",
+    "redeemStepAggregate": "Aggregating proofs",
     "@redeemStepAggregate": {
-      "description": "Redeem progress step: aggregating and submitting"
+      "description": "Redeem progress step: aggregating ZK proofs"
+    },
+    "redeemStepSubmit": "Submitting to chain",
+    "@redeemStepSubmit": {
+      "description": "Redeem progress step: submitting the transaction"
     },
     "redeemFetchedCount": "{count} fetched",
     "@redeemFetchedCount": {
@@ -2673,5 +2789,105 @@
           "type": "int"
         }
       }
+    },
+    "encryptedSendFeeLabel": "Privacy fee",
+    "@encryptedSendFeeLabel": {
+      "description": "Fee label for encrypted sends (wormhole volume fee)"
+    },
+    "encryptedSendAmountStep": "Use steps of 0.01 {tokenSymbol}",
+    "@encryptedSendAmountStep": {
+      "description": "Shown when an encrypted send amount is not a multiple of 0.01 token",
+      "placeholders": {
+        "tokenSymbol": {
+          "type": "String"
+        }
+      }
+    },
+    "encryptedSendMinimum": "Encrypted sends must move at least 0.1 {tokenSymbol}",
+    "@encryptedSendMinimum": {
+      "description": "Shown when an encrypted send falls below the chain's minimum exit amount",
+      "placeholders": {
+        "tokenSymbol": {
+          "type": "String"
+        }
+      }
+    },
+    "encryptedSendProgressTitle": "Private Send",
+    "@encryptedSendProgressTitle": {
+      "description": "App bar title while an encrypted send is proving/submitting"
+    },
+    "encryptedSendFailedTitle": "Send Failed",
+    "@encryptedSendFailedTitle": {
+      "description": "App bar title when an encrypted send failed"
+    },
+    "encryptedSendCancelledTitle": "Send Cancelled",
+    "@encryptedSendCancelledTitle": {
+      "description": "App bar title when an encrypted send was cancelled"
+    },
+    "encryptedSendingLabel": "SENDING PRIVATELY",
+    "@encryptedSendingLabel": {
+      "description": "Status header label on encrypted send progress"
+    },
+    "encryptedSendStepPreparing": "Preparing",
+    "@encryptedSendStepPreparing": {
+      "description": "Encrypted send progress step: preparing circuits"
+    },
+    "encryptedSendStepGathering": "Gathering funds",
+    "@encryptedSendStepGathering": {
+      "description": "Encrypted send progress step: fetching on-chain state for the batch"
+    },
+    "encryptedSendStepSecuring": "Securing transaction",
+    "@encryptedSendStepSecuring": {
+      "description": "Encrypted send progress step: computing and checking nullifiers"
+    },
+    "encryptedSendStepGenerating": "Generate proofs",
+    "@encryptedSendStepGenerating": {
+      "description": "Encrypted send progress step: generating individual ZK proofs"
+    },
+    "encryptedSendStepProving": "Building privacy proof",
+    "@encryptedSendStepProving": {
+      "description": "Encrypted send progress step: aggregating ZK proofs"
+    },
+    "encryptedSendStepSubmitting": "Submitting to chain",
+    "@encryptedSendStepSubmitting": {
+      "description": "Encrypted send progress step: submitting the transaction"
+    },
+    "encryptedSendProgressFooter": "Privacy takes a moment. Please keep the app open until the transaction completes.",
+    "@encryptedSendProgressFooter": {
+      "description": "Footer text on encrypted send progress screen"
+    },
+    "encryptedSendCancelledPartial": "{amount} was already sent before cancelling. The rest remains in your account.",
+    "@encryptedSendCancelledPartial": {
+      "description": "Notice on the cancelled encrypted-send screen when some batches were already submitted",
+      "placeholders": {
+        "amount": {
+          "type": "String"
+        }
+      }
+    },
+    "encryptedSendFundsSafeLabel": "Your funds are safe",
+    "@encryptedSendFundsSafeLabel": {
+      "description": "Stacked banner kicker when an encrypted send was cancelled before anything left the wallet"
+    },
+    "encryptedSendFundsSafeCaption": "Still in {account}. Nothing left your wallet.",
+    "@encryptedSendFundsSafeCaption": {
+      "description": "Stacked banner caption when an encrypted send was cancelled before anything left the wallet",
+      "placeholders": {
+        "account": {
+          "type": "String"
+        }
+      }
+    },
+    "privateSendTitle": "Private Send",
+    "@privateSendTitle": {
+      "description": "Title of the private-send notice on encrypted send recipient screen"
+    },
+    "privateSendSubtitle": "Hides the link between your account and the recipient",
+    "@privateSendSubtitle": {
+      "description": "Subtitle of the private-send notice on encrypted send recipient screen. Must not overstate the guarantee: the recipient and amount are still visible on chain, only the source linkage is hidden."
+    },
+    "encryptedSendPlanStale": "Your encrypted balance changed while reviewing. Please go back and enter the amount again.",
+    "@encryptedSendPlanStale": {
+      "description": "Error shown when the planned inputs of an encrypted send were spent between review and confirm"
     }
   }

@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:quantus_sdk/quantus_sdk.dart' hide ScaffoldBase;
+import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
 import 'package:resonance_network_wallet/providers/l10n_provider.dart';
 import 'package:resonance_network_wallet/shared/constants/e2e_keys.dart';
-import 'package:resonance_network_wallet/v2/components/back_button.dart';
 import 'package:resonance_network_wallet/v2/components/explorer_link.dart';
-import 'package:resonance_network_wallet/v2/components/quantus_button.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base.dart';
-import 'package:resonance_network_wallet/v2/components/scaffold_base_bottom_content.dart';
-import 'package:resonance_network_wallet/v2/components/v2_app_bar.dart';
 import 'package:resonance_network_wallet/v2/screens/home/home_screen.dart';
 import 'package:resonance_network_wallet/v2/screens/send/send_strategy.dart';
-import 'package:resonance_network_wallet/v2/theme/app_colors.dart';
-import 'package:resonance_network_wallet/v2/theme/app_text_styles.dart';
 
 /// Shared success screen for both regular sends and multisig proposals,
 /// configured entirely by [SendTerminalContent].
@@ -21,6 +15,10 @@ class SendTerminalScreen extends ConsumerWidget {
 
   const SendTerminalScreen({super.key, required this.content});
 
+  static const _successRingSize = 78.0;
+  static const _checkIconSize = 32.0;
+  static const _borderWidth = 2.0;
+
   void _popToHome(BuildContext context) {
     Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const HomeScreen()), (route) => false);
   }
@@ -28,8 +26,8 @@ class SendTerminalScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
     final shortAddr = AddressFormattingService.formatAddress(content.recipientAddress.trim());
     final checksum = content.recipientChecksum;
     final signaturesLabel = content.signaturesLabel;
@@ -58,57 +56,41 @@ class SendTerminalScreen extends ConsumerWidget {
                   Text(
                     content.headline,
                     textAlign: TextAlign.center,
-                    style: text.largeTitle?.copyWith(fontWeight: FontWeight.w400),
+                    style: text.titleSuccess.copyWith(color: colors.textContent),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     content.subline,
                     textAlign: TextAlign.center,
-                    style: text.smallParagraph?.copyWith(color: colors.textTertiary, letterSpacing: 0.74),
+                    style: text.body.copyWith(color: colors.textMuted),
                   ),
                   const SizedBox(height: 32),
                   if (content.amountText != null) ...[
-                    Text(content.amountText!, style: text.smallTitle?.copyWith(color: colors.textPrimary)),
+                    Text(content.amountText!, style: text.amountInline.copyWith(color: colors.textContent)),
                     const SizedBox(height: 16),
                   ],
-                  Text.rich(
+                  Text(
+                    '${l10n.sendTxSubmittedToLabel}:',
                     textAlign: TextAlign.center,
-                    TextSpan(
-                      style: text.paragraph?.copyWith(color: colors.textPrimary),
-                      children: [
-                        TextSpan(
-                          text: l10n.sendTxSubmittedToLabel,
-                          style: text.paragraph?.copyWith(fontWeight: FontWeight.w500),
-                        ),
-                        TextSpan(
-                          text: ':',
-                          style: text.paragraph?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
+                    style: text.bodyEmphasis.copyWith(color: colors.textContent),
                   ),
                   const SizedBox(height: 16),
                   if (checksum != null && checksum.isNotEmpty) ...[
                     Text(
                       checksum,
                       textAlign: TextAlign.center,
-                      style: text.smallParagraph?.copyWith(color: colors.checksum, height: 1.0),
+                      style: text.body.copyWith(color: colors.semanticLilac),
                     ),
                     const SizedBox(height: 4),
                   ],
                   Text(
                     shortAddr,
                     textAlign: TextAlign.center,
-                    style: text.smallParagraph?.copyWith(
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: AppTextTheme.fontFamilySecondary,
-                      height: 1.35,
-                    ),
+                    style: text.dataAddressLarge.copyWith(color: colors.textContent),
                   ),
                   if (signaturesLabel != null) ...[
                     const SizedBox(height: 32),
-                    _signaturesChip(colors, text, signaturesLabel),
+                    _signaturesChip(context, colors, text, signaturesLabel),
                   ],
                 ],
               ),
@@ -116,7 +98,7 @@ class SendTerminalScreen extends ConsumerWidget {
             if (content.explorerUrl != null) ...[
               const Spacer(),
               Center(child: ExplorerLink(url: content.explorerUrl)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
             ],
           ],
         ),
@@ -132,36 +114,35 @@ class SendTerminalScreen extends ConsumerWidget {
     );
   }
 
-  Widget _signaturesChip(AppColorsV2 colors, AppTextTheme text, String label) {
+  Widget _signaturesChip(BuildContext context, AppColorsV3 colors, AppTextThemeV3 text, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: colors.surfaceDeep,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.borderButton.useOpacity(0.4)),
+        color: colors.bgSurface,
+        borderRadius: context.radiusV3.mdBorder,
+        border: Border.all(color: colors.borderHairline),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.fingerprint, size: 18, color: colors.checksum),
+          Icon(Icons.fingerprint, size: 18, color: colors.textMuted),
           const SizedBox(width: 8),
-          Text(label, style: text.smallParagraph?.copyWith(color: colors.textPrimary)),
+          Text(label, style: text.body.copyWith(color: colors.textContent)),
         ],
       ),
     );
   }
 
-  Widget _successMark(AppColorsV2 colors) {
-    const size = 78.0;
+  Widget _successMark(AppColorsV3 colors) {
     return Container(
-      width: size,
-      height: size,
+      width: _successRingSize,
+      height: _successRingSize,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: colors.success, width: 2),
+        border: Border.all(color: colors.semanticSage, width: _borderWidth),
       ),
       alignment: Alignment.center,
-      child: Icon(Icons.check, size: 32, color: colors.success),
+      child: Icon(Icons.check_rounded, size: _checkIconSize, color: colors.semanticSage),
     );
   }
 }

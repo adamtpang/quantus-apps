@@ -1,14 +1,78 @@
 use qp_wormhole_circuit::{
     inputs::{CircuitInputs, PrivateCircuitInputs},
     nullifier::Nullifier,
+    sensitive::Secret,
 };
-use qp_wormhole_inputs::PublicCircuitInputs;
-use qp_wormhole_prover::WormholeProver;
+use qp_wormhole_inputs::{BytesDigest, PublicCircuitInputs};
 use qp_zk_circuits_common::{
-    utils::{digest_to_bytes, BytesDigest},
+    utils::digest_to_bytes,
     zk_merkle::{hash_node_presorted, SIBLINGS_PER_LEVEL},
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+pub const ZK_CIRCUITS_VERSION: &str = "4.3.0";
+
+fn versioned_bins_dir(base: &Path) -> PathBuf {
+    base.join(format!("v{}", ZK_CIRCUITS_VERSION))
+}
+
+// Flat-dir artifacts from pre-versioned installs. Union of 3.0 (`aggregated_*`)
+// and 3.1 (`private_batch_*` + `dummy_private_batch_proof.bin` from
+// `generate_all_circuit_binaries(..., true, ...)`).
+const LEGACY_FILES: &[&str] = &[
+    "common.bin",
+    "verifier.bin",
+    "dummy_proof.bin",
+    "prover.bin",
+    "config.json",
+    "private_batch_common.bin",
+    "private_batch_verifier.bin",
+    "private_batch_prover.bin",
+    "dummy_private_batch_proof.bin",
+    "aggregated_prover.bin",
+    "aggregated_verifier.bin",
+    "aggregated_common.bin",
+];
+
+fn cleanup_stale_circuit_dirs(base: &Path) {
+    for name in LEGACY_FILES {
+        let path = base.join(name);
+        if path.exists() {
+            eprintln!("[circuits] removing legacy file: {}", path.display());
+            if let Err(e) = std::fs::remove_file(&path) {
+                eprintln!("[circuits] failed to remove {}: {}", path.display(), e);
+            }
+        }
+    }
+
+    let current = format!("v{}", ZK_CIRCUITS_VERSION);
+    let entries = match std::fs::read_dir(base) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.starts_with('v') && name_str != current && entry.path().is_dir() {
+            eprintln!(
+                "[circuits] removing old version dir: {}",
+                entry.path().display()
+            );
+            if let Err(e) = std::fs::remove_dir_all(entry.path()) {
+                eprintln!(
+                    "[circuits] failed to remove {}: {}",
+                    entry.path().display(),
+                    e
+                );
+            }
+        }
+    }
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn zk_circuits_version() -> String {
+    ZK_CIRCUITS_VERSION.to_string()
+}
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn compute_address_hash_hex(raw_address: Vec<u8>) -> Result<String, String> {
@@ -19,8 +83,6 @@ pub fn compute_address_hash_hex(raw_address: Vec<u8>) -> Result<String, String> 
     Ok(hex::encode(hash.as_bytes()))
 }
 
-pub const NATIVE_ASSET_ID: u32 = 0;
-pub const VOLUME_FEE_BPS: u32 = 10;
 pub const SCALE_DOWN_FACTOR: u128 = 10_000_000_000;
 // Must match the chain's aggregation batch size (num_n=7 since v0.7.1-q-day-2).
 pub const DEFAULT_NUM_LEAF_PROOFS: usize = 7;
@@ -42,6 +104,8 @@ pub struct ProofInput {
     pub positions: Vec<u8>,
     pub exit_account_1: Vec<u8>,
     pub output_amount_1: u32,
+    pub exit_account_2: Vec<u8>,
+    pub output_amount_2: u32,
     pub volume_fee_bps: u32,
     pub asset_id: u32,
 }
@@ -85,8 +149,15 @@ pub fn compute_wormhole_address(secret: Vec<u8>) -> Result<Vec<u8>, String> {
 }
 
 #[flutter_rust_bridge::frb(sync)]
-pub fn wormhole_compute_output_amount(input_amount: u32, fee_bps: u32) -> u32 {
-    ((input_amount as u64) * (10000 - fee_bps as u64) / 10000) as u32
+pub fn wormhole_compute_output_amount(input_amount: u32, fee_bps: u32) -> Result<u32, String> {
+    let factor = 10_000u64
+        .checked_sub(fee_bps as u64)
+        .ok_or_else(|| format!("fee_bps must be <= 10000, got {}", fee_bps))?;
+    let output = (input_amount as u64)
+        .checked_mul(factor)
+        .ok_or_else(|| "Output amount overflow".to_string())?
+        / 10_000;
+    u32::try_from(output).map_err(|_| "Output amount exceeds u32 range".to_string())
 }
 
 #[flutter_rust_bridge::frb(sync)]
@@ -101,7 +172,9 @@ pub fn decode_leaf_amount(leaf_data: Vec<u8>) -> Result<u32, String> {
         .try_into()
         .map_err(|_| "Failed to extract amount bytes".to_string())?;
     let raw_amount = u128::from_le_bytes(amount_bytes);
-    Ok((raw_amount / SCALE_DOWN_FACTOR) as u32)
+    let scaled = raw_amount / SCALE_DOWN_FACTOR;
+    u32::try_from(scaled)
+        .map_err(|_| format!("Leaf amount {} exceeds u32 range after scaling", scaled))
 }
 
 #[flutter_rust_bridge::frb(sync)]
@@ -191,7 +264,8 @@ pub fn compute_merkle_positions(
             }
         }
 
-        current_hash = hash_node_presorted(&all_four);
+        current_hash = hash_node_presorted(&all_four)
+            .map_err(|e| format!("Failed to hash merkle node at level: {}", e))?;
     }
 
     Ok(MerkleProcessed {
@@ -201,15 +275,24 @@ pub fn compute_merkle_positions(
 }
 
 pub fn ensure_circuit_binaries(bins_dir: String) -> Result<String, String> {
-    let dir = Path::new(&bins_dir);
-    std::fs::create_dir_all(dir)
+    let base = Path::new(&bins_dir);
+    std::fs::create_dir_all(base)
         .map_err(|e| format!("Failed to create bins directory {}: {}", bins_dir, e))?;
 
+    cleanup_stale_circuit_dirs(base);
+
+    let dir = versioned_bins_dir(base);
+    std::fs::create_dir_all(&dir).map_err(|e| {
+        format!(
+            "Failed to create versioned bins directory {}: {}",
+            dir.display(),
+            e
+        )
+    })?;
+
     let config_path = dir.join("config.json");
-    if all_required_files_exist(dir) {
-        // Reuse existing binaries only if they were generated with the current
-        // batch size; otherwise regenerate (e.g. after the chain's 16 -> 7 change).
-        match qp_wormhole_circuit_builder::CircuitBinsConfig::load(dir) {
+    if all_required_files_exist(&dir) {
+        match qp_wormhole_circuit_builder::CircuitBinsConfig::load(&dir) {
             Ok(config) if config.num_leaf_proofs == DEFAULT_NUM_LEAF_PROOFS => {
                 return std::fs::read_to_string(&config_path)
                     .map_err(|e| format!("Failed to read config.json: {}", e));
@@ -219,7 +302,7 @@ pub fn ensure_circuit_binaries(bins_dir: String) -> Result<String, String> {
     }
 
     qp_wormhole_circuit_builder::generate_all_circuit_binaries(
-        dir,
+        &dir,
         true,
         DEFAULT_NUM_LEAF_PROOFS,
         None,
@@ -232,14 +315,19 @@ pub fn ensure_circuit_binaries(bins_dir: String) -> Result<String, String> {
 }
 
 fn all_required_files_exist(dir: &Path) -> bool {
+    // Must match the artifacts produced by `generate_all_circuit_binaries` in
+    // qp-wormhole-* 4.2.x. No circuit emits a prover binary anymore (provers
+    // always rebuild their circuits from source), so `private_batch_prover.bin`
+    // is gone; `PrivateBatchProver::new_from_binaries_dir` now loads only
+    // common.bin, verifier.bin, dummy_proof.bin and config.json. Keeping the
+    // removed prover file in this list makes the check never pass, forcing a
+    // full (expensive) circuit regeneration on every call.
     const REQUIRED: &[&str] = &[
-        "prover.bin",
-        "verifier.bin",
         "common.bin",
-        "aggregated_prover.bin",
-        "aggregated_verifier.bin",
-        "aggregated_common.bin",
+        "verifier.bin",
         "dummy_proof.bin",
+        "private_batch_common.bin",
+        "private_batch_verifier.bin",
         "config.json",
     ];
     REQUIRED.iter().all(|f| dir.join(f).exists())
@@ -247,8 +335,8 @@ fn all_required_files_exist(dir: &Path) -> bool {
 
 pub fn generate_proof(
     input: ProofInput,
-    prover_bin_path: String,
-    common_bin_path: String,
+    _prover_bin_path: String,
+    _common_bin_path: String,
 ) -> Result<ProofOutput, String> {
     let secret_digest = vec_to_digest(&input.secret, "secret")?;
     let wormhole_address = vec_to_32(&input.wormhole_address, "wormhole_address")?;
@@ -295,14 +383,13 @@ pub fn generate_proof(
     }
 
     let private = PrivateCircuitInputs {
-        secret: secret_digest,
+        secret: Secret::from(secret_digest),
         transfer_count: input.transfer_count,
         unspendable_account: unspendable_bytes,
         parent_hash: vec_to_digest(&input.parent_hash, "parent_hash")?,
         state_root: vec_to_digest(&input.state_root, "state_root")?,
         extrinsics_root: vec_to_digest(&input.extrinsics_root, "extrinsics_root")?,
         digest: digest_padded,
-        input_amount: input.input_amount,
         zk_tree_root: vec_to_32(&input.zk_tree_root, "zk_tree_root")?,
         zk_merkle_siblings,
         zk_merkle_positions: input.positions.clone(),
@@ -311,20 +398,19 @@ pub fn generate_proof(
     let public = PublicCircuitInputs {
         asset_id: input.asset_id,
         output_amount_1: input.output_amount_1,
-        output_amount_2: 0,
+        output_amount_2: input.output_amount_2,
         volume_fee_bps: input.volume_fee_bps,
         nullifier: nullifier_bytes,
         exit_account_1: vec_to_digest(&input.exit_account_1, "exit_account_1")?,
-        exit_account_2: vec_to_digest(&[0u8; 32], "exit_account_2")?,
+        exit_account_2: vec_to_digest(&input.exit_account_2, "exit_account_2")?,
         block_hash: vec_to_digest(&input.block_hash, "block_hash")?,
         block_number: input.block_number,
+        input_amount: input.input_amount,
     };
 
     let circuit_inputs = CircuitInputs { public, private };
 
-    let prover =
-        WormholeProver::new_from_files(Path::new(&prover_bin_path), Path::new(&common_bin_path))
-            .map_err(|e| format!("Failed to load prover: {}", e))?;
+    let prover = qp_wormhole_prover::build_fresh();
 
     let prover_with_inputs = prover
         .commit(&circuit_inputs)
@@ -340,33 +426,289 @@ pub fn generate_proof(
     })
 }
 
-pub fn aggregate_proofs(proof_bytes_list: Vec<Vec<u8>>, bins_dir: String) -> Result<Vec<u8>, String> {
+pub fn aggregate_proofs(
+    proof_bytes_list: Vec<Vec<u8>>,
+    bins_dir: String,
+) -> Result<Vec<u8>, String> {
     use plonky2::plonk::proof::ProofWithPublicInputs;
-    use qp_wormhole_aggregator::{
-        aggregator::{AggregationBackend, CircuitType, Layer0Aggregator},
-    };
+    use qp_wormhole_aggregator::private_batch::prover::PrivateBatchProver;
     use qp_zk_circuits_common::circuit::{C, D, F};
 
-    let bins_path = Path::new(&bins_dir);
+    let bins_path = versioned_bins_dir(Path::new(&bins_dir));
 
-    let mut aggregator = Layer0Aggregator::new(bins_path)
-        .map_err(|e| format!("Failed to load aggregator: {}", e))?;
+    let leaf_prover = qp_wormhole_prover::build_fresh();
+    let common_data = &leaf_prover.circuit_data.common;
 
-    let common_data = aggregator
-        .load_common_data(CircuitType::Leaf)
-        .map_err(|e| format!("Failed to load leaf circuit data: {}", e))?;
+    let leaf_proofs: Vec<_> = proof_bytes_list
+        .iter()
+        .enumerate()
+        .map(|(i, bytes)| {
+            ProofWithPublicInputs::<F, C, D>::from_bytes(bytes.clone(), common_data)
+                .map_err(|e| format!("Failed to deserialize proof {}: {:?}", i, e))
+        })
+        .collect::<Result<_, _>>()?;
 
-    for (i, proof_bytes) in proof_bytes_list.iter().enumerate() {
-        let proof = ProofWithPublicInputs::<F, C, D>::from_bytes(proof_bytes.clone(), &common_data)
-            .map_err(|e| format!("Failed to deserialize proof {}: {:?}", i, e))?;
-        aggregator
-            .push_proof(proof)
-            .map_err(|e| format!("Failed to push proof {}: {}", i, e))?;
-    }
+    let prover = PrivateBatchProver::new_from_binaries_dir(&bins_path)
+        .map_err(|e| format!("Failed to create private-batch prover: {}", e))?;
 
-    let aggregated = aggregator
-        .aggregate()
+    let aggregated = prover
+        .aggregate(leaf_proofs)
         .map_err(|e| format!("Aggregation failed: {}", e))?;
 
     Ok(aggregated.to_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn versioned_bins_dir_appends_version() {
+        let base = Path::new("/tmp/circuits");
+        let result = versioned_bins_dir(base);
+        assert_eq!(
+            result,
+            PathBuf::from(format!("/tmp/circuits/v{}", ZK_CIRCUITS_VERSION))
+        );
+    }
+
+    #[test]
+    fn zk_circuits_version_matches_const() {
+        assert_eq!(zk_circuits_version(), ZK_CIRCUITS_VERSION);
+    }
+
+    // Independent of LEGACY_FILES so omissions in that list fail the tests.
+    const V3_0_MANIFEST: &[&str] = &[
+        "prover.bin",
+        "verifier.bin",
+        "common.bin",
+        "aggregated_prover.bin",
+        "aggregated_verifier.bin",
+        "aggregated_common.bin",
+        "dummy_proof.bin",
+        "config.json",
+    ];
+
+    const V3_1_MANIFEST: &[&str] = &[
+        "common.bin",
+        "verifier.bin",
+        "dummy_proof.bin",
+        "private_batch_common.bin",
+        "private_batch_verifier.bin",
+        "private_batch_prover.bin",
+        "dummy_private_batch_proof.bin",
+        "config.json",
+    ];
+
+    #[test]
+    fn legacy_files_covers_historical_manifests() {
+        for name in V3_0_MANIFEST.iter().chain(V3_1_MANIFEST.iter()) {
+            assert!(
+                LEGACY_FILES.contains(name),
+                "LEGACY_FILES missing historical artifact {}",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn cleanup_removes_v3_0_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path();
+        for name in V3_0_MANIFEST {
+            std::fs::write(base.join(name), b"x").unwrap();
+        }
+        cleanup_stale_circuit_dirs(base);
+        for name in V3_0_MANIFEST {
+            assert!(
+                !base.join(name).exists(),
+                "{} should have been removed",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn cleanup_removes_v3_1_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path();
+        for name in V3_1_MANIFEST {
+            std::fs::write(base.join(name), b"x").unwrap();
+        }
+        cleanup_stale_circuit_dirs(base);
+        for name in V3_1_MANIFEST {
+            assert!(
+                !base.join(name).exists(),
+                "{} should have been removed",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn cleanup_removes_old_version_dirs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path();
+        std::fs::create_dir(base.join("v1.0.0")).unwrap();
+        std::fs::create_dir(base.join("v3.9.0")).unwrap();
+        let current = format!("v{}", ZK_CIRCUITS_VERSION);
+        std::fs::create_dir(base.join(&current)).unwrap();
+
+        cleanup_stale_circuit_dirs(base);
+
+        assert!(!base.join("v1.0.0").exists());
+        assert!(!base.join("v3.9.0").exists());
+        assert!(
+            base.join(&current).exists(),
+            "current version dir must survive"
+        );
+    }
+
+    #[test]
+    fn cleanup_ignores_non_version_entries() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path();
+        std::fs::create_dir(base.join("other_dir")).unwrap();
+        std::fs::write(base.join("notes.txt"), b"keep").unwrap();
+
+        cleanup_stale_circuit_dirs(base);
+
+        assert!(base.join("other_dir").exists());
+        assert!(base.join("notes.txt").exists());
+    }
+
+    #[test]
+    fn cleanup_on_empty_dir_is_noop() {
+        let tmp = tempfile::tempdir().unwrap();
+        cleanup_stale_circuit_dirs(tmp.path());
+    }
+
+    #[test]
+    fn all_required_files_exist_true_when_complete() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        for name in &[
+            "common.bin",
+            "verifier.bin",
+            "dummy_proof.bin",
+            "private_batch_common.bin",
+            "private_batch_verifier.bin",
+            "config.json",
+        ] {
+            std::fs::write(dir.join(name), b"x").unwrap();
+        }
+        assert!(all_required_files_exist(dir));
+    }
+
+    #[test]
+    fn all_required_files_exist_false_when_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        std::fs::write(dir.join("common.bin"), b"x").unwrap();
+        assert!(!all_required_files_exist(dir));
+    }
+
+    #[test]
+    fn compute_address_hash_hex_deterministic() {
+        let addr = vec![42u8; 32];
+        let h1 = compute_address_hash_hex(addr.clone()).unwrap();
+        let h2 = compute_address_hash_hex(addr).unwrap();
+        assert_eq!(h1, h2);
+        assert_eq!(h1.len(), 64);
+    }
+
+    #[test]
+    fn compute_address_hash_hex_rejects_wrong_length() {
+        assert!(compute_address_hash_hex(vec![0u8; 31]).is_err());
+        assert!(compute_address_hash_hex(vec![0u8; 33]).is_err());
+    }
+
+    #[test]
+    fn output_amount_with_10bps_fee() {
+        let out = wormhole_compute_output_amount(10_000, 10).unwrap();
+        assert_eq!(out, 9990);
+    }
+
+    #[test]
+    fn output_amount_zero_fee() {
+        let out = wormhole_compute_output_amount(10_000, 0).unwrap();
+        assert_eq!(out, 10_000);
+    }
+
+    #[test]
+    fn output_amount_full_fee() {
+        let out = wormhole_compute_output_amount(10_000, 10_000).unwrap();
+        assert_eq!(out, 0);
+    }
+
+    #[test]
+    fn output_amount_rejects_excessive_fee() {
+        assert!(wormhole_compute_output_amount(1, 10_001).is_err());
+    }
+
+    #[test]
+    fn decode_leaf_amount_valid() {
+        let mut data = vec![0u8; 60];
+        let amount: u128 = 500 * SCALE_DOWN_FACTOR;
+        data[44..60].copy_from_slice(&amount.to_le_bytes());
+        assert_eq!(decode_leaf_amount(data).unwrap(), 500);
+    }
+
+    #[test]
+    fn decode_leaf_amount_too_short() {
+        assert!(decode_leaf_amount(vec![0u8; 59]).is_err());
+    }
+
+    #[test]
+    fn decode_leaf_transfer_count_valid() {
+        let mut data = vec![0u8; 40];
+        data[32..40].copy_from_slice(&77u64.to_le_bytes());
+        assert_eq!(decode_leaf_transfer_count(data).unwrap(), 77);
+    }
+
+    #[test]
+    fn decode_leaf_transfer_count_too_short() {
+        assert!(decode_leaf_transfer_count(vec![0u8; 39]).is_err());
+    }
+
+    #[test]
+    fn decode_leaf_to_account_valid() {
+        let mut data = vec![0u8; 64];
+        data[0..32].copy_from_slice(&[0xAB; 32]);
+        assert_eq!(decode_leaf_to_account(data).unwrap(), vec![0xAB; 32]);
+    }
+
+    #[test]
+    fn decode_leaf_to_account_too_short() {
+        assert!(decode_leaf_to_account(vec![0u8; 31]).is_err());
+    }
+
+    #[test]
+    fn compute_nullifier_deterministic() {
+        let secret = vec![1u8; 32];
+        let n1 = compute_nullifier(secret.clone(), 0).unwrap();
+        let n2 = compute_nullifier(secret.clone(), 0).unwrap();
+        assert_eq!(n1, n2);
+        let n3 = compute_nullifier(secret, 1).unwrap();
+        assert_ne!(n1, n3);
+    }
+
+    #[test]
+    fn compute_nullifier_rejects_bad_length() {
+        assert!(compute_nullifier(vec![0u8; 16], 0).is_err());
+    }
+
+    #[test]
+    fn compute_wormhole_address_deterministic() {
+        let secret = vec![7u8; 32];
+        let a1 = compute_wormhole_address(secret.clone()).unwrap();
+        let a2 = compute_wormhole_address(secret).unwrap();
+        assert_eq!(a1, a2);
+        assert_eq!(a1.len(), 32);
+    }
+
+    #[test]
+    fn compute_wormhole_address_rejects_bad_length() {
+        assert!(compute_wormhole_address(vec![0u8; 10]).is_err());
+    }
 }

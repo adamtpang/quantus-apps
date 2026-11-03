@@ -110,66 +110,6 @@ abstract class AppLocalizations {
   /// **'OK'**
   String get walletInitErrorButtonLabel;
 
-  /// Title of the account migration dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Migrate your accounts'**
-  String get migrationDialogTitle;
-
-  /// Body text of the account migration dialog
-  ///
-  /// In en, this message translates to:
-  /// **'We\'ll record your old‑chain testnet rewards and actions to determine rewards on the new Quantus Testnet.\n\nBalances do not migrate.\n\nUse the new testnet faucet for funds.'**
-  String get migrationDialogBody;
-
-  /// Number of accounts that will be migrated
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 Account to migrate.} other{{count} Accounts to migrate.}}'**
-  String migrationDialogAccountsToMigrate(int count);
-
-  /// Number of accounts that cannot be migrated
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 account cannot be migrated (missing wallet data).} other{{count} accounts cannot be migrated (missing wallet data).}}'**
-  String migrationDialogAccountsCannotMigrate(int count);
-
-  /// Error shown in the migration dialog when the upload fails
-  ///
-  /// In en, this message translates to:
-  /// **'We couldn\'t upload migration data. Please retry or try later.'**
-  String get migrationDialogUploadError;
-
-  /// Label for the migrate button in the migration dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Migrate Accounts'**
-  String get migrationDialogMigrate;
-
-  /// Label for the retry button in the migration dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Retry'**
-  String get migrationDialogRetry;
-
-  /// Label for the try-later button in the migration dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Try later'**
-  String get migrationDialogTryLater;
-
-  /// Label for the skip button in the migration dialog when no accounts can be migrated
-  ///
-  /// In en, this message translates to:
-  /// **'Skip'**
-  String get migrationDialogSkip;
-
-  /// Toast shown when some accounts failed to migrate
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 account could not be migrated. Migration will retry on next app launch.} other{{count} accounts could not be migrated. Migration will retry on next app launch.}}'**
-  String migrationPartialFailureToast(int count);
-
   /// Text for the text on the lock screen when using device biometrics to unlock
   ///
   /// In en, this message translates to:
@@ -296,6 +236,30 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get accountReadyDone;
 
+  /// Subtitle on wallet created ready screen explaining the two accounts
+  ///
+  /// In en, this message translates to:
+  /// **'Two accounts were created for you.'**
+  String get accountReadyTwoAccountsCreated;
+
+  /// Description under the transparent main account card after wallet creation
+  ///
+  /// In en, this message translates to:
+  /// **'Your main account. Fast, visible on chain.'**
+  String get accountReadyMainAccountDescription;
+
+  /// Description under the encrypted account card after wallet creation
+  ///
+  /// In en, this message translates to:
+  /// **'For private transactions. Shielded, slower.'**
+  String get accountReadyEncryptedAccountDescription;
+
+  /// Primary CTA on the wallet created ready screen
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Wallet'**
+  String get accountReadyGoToWallet;
+
   /// App bar title on the import wallet screen
   ///
   /// In en, this message translates to:
@@ -338,12 +302,6 @@ abstract class AppLocalizations {
   /// **'No active account'**
   String get homeNoActiveAccount;
 
-  /// POS charge button on the home screen bottom bar
-  ///
-  /// In en, this message translates to:
-  /// **'Charge'**
-  String get homeCharge;
-
   /// Faucet button when balance is zero on the home screen
   ///
   /// In en, this message translates to:
@@ -361,6 +319,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back up your recovery phrase'**
   String get homeBackupReminder;
+
+  /// Full-width strip shown when the device is offline; rendered uppercase
+  ///
+  /// In en, this message translates to:
+  /// **'Offline · showing last known balances'**
+  String get networkStatusOfflineBanner;
 
   /// Receive action button on the home screen
   ///
@@ -413,8 +377,8 @@ abstract class AppLocalizations {
   /// Empty state message in home activity section
   ///
   /// In en, this message translates to:
-  /// **'Your activity will appear here once you send or receive QUAN.'**
-  String get homeActivityEmptyMessage;
+  /// **'Your activity will appear here once you send or receive {tokenSymbol}.'**
+  String homeActivityEmptyMessage(String tokenSymbol);
 
   /// Title of the accounts bottom sheet
   ///
@@ -470,29 +434,35 @@ abstract class AppLocalizations {
   /// **'{number, plural, =1{Keystone Hardware Wallet} other{Keystone Hardware Wallet {number}}}'**
   String accountsSheetKeystoneWallet(int number);
 
-  /// Sub-segment header for transparent accounts
+  /// Badge on the wallet header containing the active account; rendered uppercase
   ///
   /// In en, this message translates to:
-  /// **'Transparent Accounts'**
-  String get accountsSheetSubheaderTransparent;
+  /// **'Active Wallet'**
+  String get accountsScreenActiveWallet;
 
-  /// Sub-segment header for the encrypted account
+  /// Account count on a collapsed wallet row
   ///
   /// In en, this message translates to:
-  /// **'Encrypted Account'**
-  String get accountsSheetSubheaderEncrypted;
+  /// **'{count, plural, =1{1 Account} other{{count} Accounts}}'**
+  String accountsScreenAccountCount(int count);
 
-  /// Sub-segment header for keystone accounts
+  /// App bar title of the wallet naming screen
   ///
   /// In en, this message translates to:
-  /// **'Keystone Accounts'**
-  String get accountsSheetSubheaderKeystone;
+  /// **'Wallet Name'**
+  String get walletNameTitle;
 
-  /// Sub-segment header for multisig accounts
+  /// Explainer text on the wallet naming screen
   ///
   /// In en, this message translates to:
-  /// **'Multisig Accounts'**
-  String get accountsSheetSubheaderMultisig;
+  /// **'Naming your wallets makes it easier to tell their accounts apart. Each wallet has its own encrypted account.'**
+  String get walletNameSubtitle;
+
+  /// Placeholder of the wallet name field
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name for your wallet'**
+  String get walletNameHint;
 
   /// App bar title on add account menu
   ///
@@ -521,7 +491,7 @@ abstract class AppLocalizations {
   /// Add keystone hardware account menu row title
   ///
   /// In en, this message translates to:
-  /// **'Add Keystone Account'**
+  /// **'Add Keystone Wallet'**
   String get addAccountMenuImportKeystoneTitle;
 
   /// Add keystone hardware account menu row subtitle
@@ -793,6 +763,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'to {address}'**
   String multisigProposalToAddress(String address);
+
+  /// Shown while the proposal's stored call bytes are being fetched before approving
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the proposal from the chain…'**
+  String get multisigProposalCallLoading;
+
+  /// Shown when the proposal's stored call bytes could not be fetched, blocking approval
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read this proposal from the chain, so there is nothing to approve. Try again when you are back online.'**
+  String get multisigProposalCallUnavailable;
+
+  /// Shown in place of the amount when the proposal's stored call bytes cannot be decoded, blocking approval
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid proposal'**
+  String get multisigProposalInvalid;
 
   /// Proposal status chip when the current signer has approved
   ///
@@ -1544,6 +1532,12 @@ abstract class AppLocalizations {
   /// **'Address Details'**
   String get accountMenuAddressDetails;
 
+  /// Menu row label shown for encrypted accounts instead of address details
+  ///
+  /// In en, this message translates to:
+  /// **'Inner Hash'**
+  String get accountMenuInnerHash;
+
   /// Show recovery phrase menu row label
   ///
   /// In en, this message translates to:
@@ -1652,65 +1646,119 @@ abstract class AppLocalizations {
   /// **'Address Details'**
   String get accountDetailsTitle;
 
-  /// Title when adding a new hardware wallet
+  /// App bar title on the encrypted account inner hash screen
   ///
   /// In en, this message translates to:
-  /// **'Add Hardware Wallet'**
-  String get addHardwareAccountAddWallet;
+  /// **'Inner Hash'**
+  String get innerHashTitle;
 
-  /// Title when adding a hardware account to existing wallet
+  /// Card label above the inner hash value
   ///
   /// In en, this message translates to:
-  /// **'Add Hardware Account'**
-  String get addHardwareAccountAddAccount;
+  /// **'INNER HASH'**
+  String get innerHashLabel;
 
-  /// Name field label
+  /// Toaster shown after copying the inner hash
   ///
   /// In en, this message translates to:
-  /// **'NAME'**
-  String get addHardwareAccountNameLabel;
+  /// **'Inner hash copied'**
+  String get innerHashCopied;
 
-  /// Name field hint for new hardware wallet
+  /// Toaster shown when deriving the inner hash fails
   ///
   /// In en, this message translates to:
-  /// **'Hardware Wallet'**
-  String get addHardwareAccountNameHintWallet;
+  /// **'Couldn\'t load inner hash'**
+  String get innerHashLoadError;
 
-  /// Name field hint for hardware account
+  /// App bar title for the add Keystone wallet screens
   ///
   /// In en, this message translates to:
-  /// **'Account'**
-  String get addHardwareAccountNameHintAccount;
+  /// **'Add Keystone Wallet'**
+  String get addKeystoneAppBarTitle;
 
-  /// Address field label
+  /// Headline on the add Keystone intro screen
   ///
   /// In en, this message translates to:
-  /// **'ADDRESS'**
-  String get addHardwareAccountAddressLabel;
+  /// **'Keystone Hardware Wallet'**
+  String get addKeystoneIntroTitle;
 
-  /// Address field hint
+  /// Subtitle on the add Keystone intro screen
   ///
   /// In en, this message translates to:
-  /// **'Signer address'**
-  String get addHardwareAccountAddressHint;
+  /// **'Air-gapped signing for QUAN. Keys stay on the device, signing happens over QR.'**
+  String get addKeystoneIntroSubtitle;
 
-  /// Debug fill button
+  /// Primary button on the add Keystone intro screen
   ///
   /// In en, this message translates to:
-  /// **'Debug Fill'**
-  String get addHardwareAccountDebugFill;
+  /// **'Connect Hardware Wallet'**
+  String get addKeystoneConnectButton;
 
-  /// Validation when name is empty
+  /// Link to the Keystone store on the add Keystone intro screen
   ///
   /// In en, this message translates to:
-  /// **'Name is required'**
-  String get addHardwareAccountNameRequired;
+  /// **'Don\'t have one? Get a Keystone ↗'**
+  String get addKeystoneGetOneLink;
 
-  /// Validation when address is invalid
+  /// Headline on the Keystone connect instructions screen
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Hardware Wallet'**
+  String get addKeystoneConnectTitle;
+
+  /// Subtitle on the Keystone connect instructions screen
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your device\'s QR code to connect.'**
+  String get addKeystoneConnectSubtitle;
+
+  /// Section label on the Keystone connect instructions screen
+  ///
+  /// In en, this message translates to:
+  /// **'BEFORE YOU START'**
+  String get addKeystoneBeforeYouStart;
+
+  /// Firmware reminder title on the Keystone connect instructions screen
+  ///
+  /// In en, this message translates to:
+  /// **'Update to the latest Keystone firmware'**
+  String get addKeystoneFirmwareTitle;
+
+  /// Firmware reminder subtitle on the Keystone connect instructions screen
+  ///
+  /// In en, this message translates to:
+  /// **'Required for QUAN signing'**
+  String get addKeystoneFirmwareSubtitle;
+
+  /// Section label for the on-device steps
+  ///
+  /// In en, this message translates to:
+  /// **'ON YOUR KEYSTONE'**
+  String get addKeystoneOnYourKeystone;
+
+  /// On-device step: unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock your Keystone'**
+  String get addKeystoneStepUnlock;
+
+  /// On-device step: select Quantus and scan
+  ///
+  /// In en, this message translates to:
+  /// **'Select Quantus and scan the QR code'**
+  String get addKeystoneStepSelectQuantus;
+
+  /// Primary button opening the QR scanner on the Keystone connect instructions screen
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to Scan'**
+  String get addKeystoneReadyToScan;
+
+  /// Shown when an address fails SS58 validation
   ///
   /// In en, this message translates to:
   /// **'Invalid address'**
-  String get addHardwareAccountInvalidAddress;
+  String get invalidAddress;
 
   /// Send flow app bar title
   ///
@@ -1856,6 +1904,12 @@ abstract class AppLocalizations {
   /// **'Failed submitting transaction'**
   String get sendReviewSubmitFailed;
 
+  /// Toast when a send is requested while the active account cannot make regular transfers
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to a regular account to send'**
+  String get sendRegularAccountRequired;
+
   /// Success headline when payment completed
   ///
   /// In en, this message translates to:
@@ -1886,6 +1940,18 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get sendTxSubmittedDone;
 
+  /// App bar title shared by the Keystone signing screens
+  ///
+  /// In en, this message translates to:
+  /// **'Sign with Keystone'**
+  String get keystoneSignScreenTitle;
+
+  /// Step indicator on the Keystone signing screens
+  ///
+  /// In en, this message translates to:
+  /// **'STEP {current}/{total}'**
+  String keystoneSignStep(int current, int total);
+
   /// Title on the Keystone sign screen showing the unsigned transaction QR
   ///
   /// In en, this message translates to:
@@ -1895,14 +1961,26 @@ abstract class AppLocalizations {
   /// Instruction on the Keystone sign screen
   ///
   /// In en, this message translates to:
-  /// **'Show this QR code to your Keystone hardware wallet to sign the transaction.'**
+  /// **'Open your Keystone and scan this QR code to load the transaction.'**
   String get keystoneSignInstruction;
 
-  /// Button to advance from showing the QR to scanning the signature
+  /// Section label above the transaction details on the Keystone sign screen
   ///
   /// In en, this message translates to:
-  /// **'Scan signature'**
+  /// **'YOU ARE SIGNING'**
+  String get keystoneSignYouAreSigning;
+
+  /// Button to advance to the next Keystone signing step
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to Sign'**
   String get keystoneSignNext;
+
+  /// Link to abort the Keystone signing flow
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Transaction'**
+  String get keystoneSignCancel;
 
   /// Error when building the unsigned transaction payload fails
   ///
@@ -1910,16 +1988,52 @@ abstract class AppLocalizations {
   /// **'Failed to prepare the transaction. Please try again.'**
   String get keystoneSignError;
 
+  /// Title on the Keystone verification screen
+  ///
+  /// In en, this message translates to:
+  /// **'Check your Keystone Screen'**
+  String get keystoneVerifyTitle;
+
+  /// Instruction on the Keystone verification screen
+  ///
+  /// In en, this message translates to:
+  /// **'Before approving on your Keystone, make sure its screen shows exactly this:'**
+  String get keystoneVerifyInstruction;
+
+  /// Warning shown when asking the user to compare the Keystone screen
+  ///
+  /// In en, this message translates to:
+  /// **'If the amount or address on your Keystone screen is different from what\'s shown here, reject the transaction on your device.'**
+  String get keystoneVerifyWarning;
+
+  /// Link opening the mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'It doesn\'t match'**
+  String get keystoneVerifyMismatch;
+
+  /// Title on the Keystone signature scanner screen
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the signature'**
+  String get keystoneScanTitle;
+
   /// Instruction on the Keystone signature scanner screen
   ///
   /// In en, this message translates to:
-  /// **'Scan the signature QR from your Keystone'**
+  /// **'Your Keystone is now showing an animated QR. Hold your phone up to it, this takes a moment.'**
   String get keystoneScanInstruction;
+
+  /// Label next to the scan progress on the Keystone signature scanner screen
+  ///
+  /// In en, this message translates to:
+  /// **'RECEIVING SIGNATURE'**
+  String get keystoneScanReceiving;
 
   /// Progress indicator showing scanned vs total animated QR frames
   ///
   /// In en, this message translates to:
-  /// **'{scanned} / {total} frames'**
+  /// **'{scanned}/{total}'**
   String keystoneScanProgress(int scanned, int total);
 
   /// Progress text before the total frame count is known
@@ -1940,6 +2054,66 @@ abstract class AppLocalizations {
   /// **'Couldn\'t read the signature. Please try again.'**
   String get keystoneScanError;
 
+  /// Error when the mortal era window closed before the signed transaction was submitted
+  ///
+  /// In en, this message translates to:
+  /// **'The transaction expired before it could be submitted. Go back and scan the new QR code with your device.'**
+  String get keystoneScanExpired;
+
+  /// Headline on the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t approve this transaction'**
+  String get keystoneRejectTitle;
+
+  /// First step title on the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'Reject the transaction on your Keystone.'**
+  String get keystoneRejectStep1Title;
+
+  /// First step body on the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is signed or sent until you approve there.'**
+  String get keystoneRejectStep1Body;
+
+  /// Second step title on the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t retry from this phone.'**
+  String get keystoneRejectStep2Title;
+
+  /// Second step body on the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'If it\'s compromised, retrying gives the attacker another chance.'**
+  String get keystoneRejectStep2Body;
+
+  /// Third step title on the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'Your funds are safe on the Keystone.'**
+  String get keystoneRejectStep3Title;
+
+  /// Third step body on the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'Keys never left the device. Move to a trusted phone before sending again.'**
+  String get keystoneRejectStep3Body;
+
+  /// Button confirming the transaction was rejected on the device
+  ///
+  /// In en, this message translates to:
+  /// **'I rejected it on Keystone'**
+  String get keystoneRejectConfirm;
+
+  /// Link to contact support from the Keystone mismatch help screen
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Support'**
+  String get keystoneRejectContactSupport;
+
   /// Button label when sending to own address
   ///
   /// In en, this message translates to:
@@ -1958,11 +2132,11 @@ abstract class AppLocalizations {
   /// **'Invalid Amount'**
   String get sendLogicInvalidAmount;
 
-  /// Button label when amount is below existential deposit
+  /// Button label when amount is below the minimum send amount (one wormhole leaf quantum)
   ///
   /// In en, this message translates to:
-  /// **'Below Existential Deposit'**
-  String get sendLogicBelowExistentialDeposit;
+  /// **'Minimum is {amount} {tokenSymbol}'**
+  String sendLogicBelowMinimum(String amount, String tokenSymbol);
 
   /// Button label when balance is insufficient
   ///
@@ -1999,6 +2173,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No transactions yet'**
   String get activityEmpty;
+
+  /// Label for total received in encrypted account activity summary
+  ///
+  /// In en, this message translates to:
+  /// **'Total Received'**
+  String get activityPrivateTotalReceived;
+
+  /// Label for total sent in encrypted account activity summary
+  ///
+  /// In en, this message translates to:
+  /// **'Total Sent'**
+  String get activityPrivateTotalSent;
 
   /// Filter button for all transactions
   ///
@@ -2059,6 +2245,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Received'**
   String get activityTxReceived;
+
+  /// Transaction row label for pending encrypted send
+  ///
+  /// In en, this message translates to:
+  /// **'Privately Sending'**
+  String get activityTxPrivatelySending;
+
+  /// Transaction row label for pending encrypted receive
+  ///
+  /// In en, this message translates to:
+  /// **'Privately Receiving'**
+  String get activityTxPrivatelyReceiving;
+
+  /// Transaction row label for completed encrypted send
+  ///
+  /// In en, this message translates to:
+  /// **'Private Sent'**
+  String get activityTxPrivateSent;
+
+  /// Transaction row label for completed encrypted receive
+  ///
+  /// In en, this message translates to:
+  /// **'Private Received'**
+  String get activityTxPrivateReceived;
 
   /// Transaction row label for multisig account creation
   ///
@@ -2149,6 +2359,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Received'**
   String get activityDetailTitleReceived;
+
+  /// Detail sheet title for pending encrypted send
+  ///
+  /// In en, this message translates to:
+  /// **'Privately Sending'**
+  String get activityDetailTitlePrivatelySending;
+
+  /// Detail sheet title for pending encrypted receive
+  ///
+  /// In en, this message translates to:
+  /// **'Privately Receiving'**
+  String get activityDetailTitlePrivatelyReceiving;
+
+  /// Detail sheet title for completed encrypted send
+  ///
+  /// In en, this message translates to:
+  /// **'Private Sent'**
+  String get activityDetailTitlePrivateSent;
+
+  /// Detail sheet title for completed encrypted receive
+  ///
+  /// In en, this message translates to:
+  /// **'Private Received'**
+  String get activityDetailTitlePrivateReceived;
 
   /// Detail sheet title for multisig creation
   ///
@@ -2324,18 +2558,6 @@ abstract class AppLocalizations {
   /// **'Receive'**
   String get receiveTitle;
 
-  /// QR Code tab on receive screen
-  ///
-  /// In en, this message translates to:
-  /// **'QR Code'**
-  String get receiveTabQrCode;
-
-  /// Address tab on receive screen
-  ///
-  /// In en, this message translates to:
-  /// **'Address'**
-  String get receiveTabAddress;
-
   /// Copy button on receive screen
   ///
   /// In en, this message translates to:
@@ -2354,113 +2576,23 @@ abstract class AppLocalizations {
   /// **'Address copied to clipboard'**
   String get receiveCopiedMessage;
 
-  /// App bar title on POS amount screen
+  /// Label above the account address on the receive screen
   ///
   /// In en, this message translates to:
-  /// **'New Charge'**
-  String get posAmountTitle;
+  /// **'YOUR ADDRESS'**
+  String get receiveYourAddressLabel;
 
-  /// Charge button with formatted amount
+  /// Primary button that copies the receive address
   ///
   /// In en, this message translates to:
-  /// **'Charge {amount}'**
-  String posAmountCharge(String amount);
+  /// **'Copy Address'**
+  String get receiveCopyAddress;
 
-  /// Charge button when amount is empty
+  /// Footnote under the checkphrase on the receive screen
   ///
   /// In en, this message translates to:
-  /// **'Enter Amount'**
-  String get posAmountEnterAmount;
-
-  /// App bar title while waiting for payment
-  ///
-  /// In en, this message translates to:
-  /// **'Scan to Pay'**
-  String get posQrTitleScanToPay;
-
-  /// App bar title when payment is received
-  ///
-  /// In en, this message translates to:
-  /// **'Payment Received'**
-  String get posQrTitlePaymentReceived;
-
-  /// Error message on POS QR screen
-  ///
-  /// In en, this message translates to:
-  /// **'Error: {error}'**
-  String posQrError(String error);
-
-  /// Shown when no active account on POS QR screen
-  ///
-  /// In en, this message translates to:
-  /// **'No active account'**
-  String get posQrNoActiveAccount;
-
-  /// Error when amount cannot be parsed
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid amount. Tap to retry.'**
-  String get posQrInvalidAmount;
-
-  /// Error when payment watch connection is lost
-  ///
-  /// In en, this message translates to:
-  /// **'Connection lost. Tap to retry.'**
-  String get posQrConnectionLost;
-
-  /// Error when payment watch times out
-  ///
-  /// In en, this message translates to:
-  /// **'Timed out. Tap to retry.'**
-  String get posQrTimedOut;
-
-  /// New charge button on POS QR screen
-  ///
-  /// In en, this message translates to:
-  /// **'New Charge'**
-  String get posQrNewCharge;
-
-  /// Done button after payment received
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get posQrDone;
-
-  /// Headline when payment is received
-  ///
-  /// In en, this message translates to:
-  /// **'{amount} received'**
-  String posQrAmountReceived(String amount);
-
-  /// Sender label on payment received screen
-  ///
-  /// In en, this message translates to:
-  /// **'From:'**
-  String get posQrFrom;
-
-  /// Status while waiting for payment
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting for payment'**
-  String get posQrWaitingForPayment;
-
-  /// Network error title on POS QR screen
-  ///
-  /// In en, this message translates to:
-  /// **'Network Error'**
-  String get posQrNetworkError;
-
-  /// Retry button on POS QR screen
-  ///
-  /// In en, this message translates to:
-  /// **'Try Again'**
-  String get posQrTryAgain;
-
-  /// Paid at timestamp on payment received screen
-  ///
-  /// In en, this message translates to:
-  /// **'At {time}'**
-  String posQrPaidAt(String time);
+  /// **'Ask the sender to confirm this phrase matches your address.'**
+  String get receiveCheckphraseFootnote;
 
   /// App bar title on settings hub
   ///
@@ -2489,7 +2621,7 @@ abstract class AppLocalizations {
   /// Preferences row subtitle on settings hub
   ///
   /// In en, this message translates to:
-  /// **'Language, currency, POS mode, notifications'**
+  /// **'Language, currency, notifications'**
   String get settingsPreferencesSubtitle;
 
   /// Mining rewards row title on settings hub
@@ -2708,18 +2840,6 @@ abstract class AppLocalizations {
   /// **'App display language'**
   String get settingsPreferencesLanguageSubtitle;
 
-  /// POS mode row on preferences
-  ///
-  /// In en, this message translates to:
-  /// **'POS Mode'**
-  String get settingsPreferencesPosMode;
-
-  /// POS mode row subtitle
-  ///
-  /// In en, this message translates to:
-  /// **'Point of sale features'**
-  String get settingsPreferencesPosModeSubtitle;
-
   /// Notifications row on preferences
   ///
   /// In en, this message translates to:
@@ -2840,11 +2960,11 @@ abstract class AppLocalizations {
   /// **'REDEEMABLE'**
   String get settingsMiningStatRedeemable;
 
-  /// QUAN earned stat label
+  /// Token earned stat label
   ///
   /// In en, this message translates to:
-  /// **'QUAN EARNED'**
-  String get settingsMiningQuanEarned;
+  /// **'{tokenSymbol} EARNED'**
+  String settingsMiningTokenEarned(String tokenSymbol);
 
   /// Link to mining telemetry
   ///
@@ -3065,14 +3185,14 @@ abstract class AppLocalizations {
   /// Exchange rate display
   ///
   /// In en, this message translates to:
-  /// **'1 QUAN = {amount} {symbol}'**
-  String swapRateLabel(String amount, String symbol);
+  /// **'1 {tokenSymbol} = {amount} {symbol}'**
+  String swapRateLabel(String amount, String symbol, String tokenSymbol);
 
   /// Exchange rate when amount is zero
   ///
   /// In en, this message translates to:
-  /// **'1 QUAN = 0 {symbol}'**
-  String swapRateZero(String symbol);
+  /// **'1 {tokenSymbol} = 0 {symbol}'**
+  String swapRateZero(String symbol, String tokenSymbol);
 
   /// Title on token picker sheet
   ///
@@ -3173,14 +3293,26 @@ abstract class AppLocalizations {
   /// Body when swap is complete
   ///
   /// In en, this message translates to:
-  /// **'Your swap for {amount} QUAN is complete.'**
-  String swapDepositCompleteBody(String amount);
+  /// **'Your swap for {amount} {tokenSymbol} is complete.'**
+  String swapDepositCompleteBody(String amount, String tokenSymbol);
 
   /// Testnet demo banner on deposit screen
   ///
   /// In en, this message translates to:
   /// **'DEMO ONLY - WE ARE STILL ON TESTNET'**
   String get swapDepositTestnetBanner;
+
+  /// Large banner making clear the swap flow is a demo and nothing is swapped
+  ///
+  /// In en, this message translates to:
+  /// **'Demo Only'**
+  String get swapDemoOnly;
+
+  /// Subtitle under the Demo Only banner
+  ///
+  /// In en, this message translates to:
+  /// **'No real swap was performed.'**
+  String get swapDemoOnlyBody;
 
   /// Button to confirm funds sent
   ///
@@ -3248,6 +3380,12 @@ abstract class AppLocalizations {
   /// **'Enter a name for your account'**
   String get componentNameFieldHint;
 
+  /// Prefix before a converted secondary amount
+  ///
+  /// In en, this message translates to:
+  /// **'≈'**
+  String get componentAmountApproximatePrefix;
+
   /// Text for generic loading state
   ///
   /// In en, this message translates to:
@@ -3259,6 +3397,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get commonCancel;
+
+  /// Text shown while a cancellation is in progress
+  ///
+  /// In en, this message translates to:
+  /// **'Canceling...'**
+  String get commonCanceling;
 
   /// Formatted balance with token symbol
   ///
@@ -3277,6 +3421,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get commonDone;
+
+  /// Retry label shown when a list or quote fails to load
+  ///
+  /// In en, this message translates to:
+  /// **'Try Again'**
+  String get commonTryAgain;
 
   /// Section label above the destination address field on redeem
   ///
@@ -3323,8 +3473,8 @@ abstract class AppLocalizations {
   /// Volume fee value on redeem confirmation
   ///
   /// In en, this message translates to:
-  /// **'0.1% volume fee'**
-  String get redeemFeeValue;
+  /// **'{rate}% volume fee'**
+  String redeemFeeValue(String rate);
 
   /// App bar title while a redeem is in progress
   ///
@@ -3380,11 +3530,17 @@ abstract class AppLocalizations {
   /// **'Generating ZK proofs'**
   String get redeemStepProofs;
 
-  /// Redeem progress step: aggregating and submitting
+  /// Redeem progress step: aggregating ZK proofs
   ///
   /// In en, this message translates to:
-  /// **'Aggregating & submitting'**
+  /// **'Aggregating proofs'**
   String get redeemStepAggregate;
+
+  /// Redeem progress step: submitting the transaction
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting to chain'**
+  String get redeemStepSubmit;
 
   /// Per-step fetched counter on redeem progress
   ///
@@ -3421,6 +3577,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{amount} redeemed in {count} batch(es)'**
   String redeemSuccessBanner(String amount, int count);
+
+  /// Fee label for encrypted sends (wormhole volume fee)
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy fee'**
+  String get encryptedSendFeeLabel;
+
+  /// Shown when an encrypted send amount is not a multiple of 0.01 token
+  ///
+  /// In en, this message translates to:
+  /// **'Use steps of 0.01 {tokenSymbol}'**
+  String encryptedSendAmountStep(String tokenSymbol);
+
+  /// Shown when an encrypted send falls below the chain's minimum exit amount
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted sends must move at least 0.1 {tokenSymbol}'**
+  String encryptedSendMinimum(String tokenSymbol);
+
+  /// App bar title while an encrypted send is proving/submitting
+  ///
+  /// In en, this message translates to:
+  /// **'Private Send'**
+  String get encryptedSendProgressTitle;
+
+  /// App bar title when an encrypted send failed
+  ///
+  /// In en, this message translates to:
+  /// **'Send Failed'**
+  String get encryptedSendFailedTitle;
+
+  /// App bar title when an encrypted send was cancelled
+  ///
+  /// In en, this message translates to:
+  /// **'Send Cancelled'**
+  String get encryptedSendCancelledTitle;
+
+  /// Status header label on encrypted send progress
+  ///
+  /// In en, this message translates to:
+  /// **'SENDING PRIVATELY'**
+  String get encryptedSendingLabel;
+
+  /// Encrypted send progress step: preparing circuits
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing'**
+  String get encryptedSendStepPreparing;
+
+  /// Encrypted send progress step: fetching on-chain state for the batch
+  ///
+  /// In en, this message translates to:
+  /// **'Gathering funds'**
+  String get encryptedSendStepGathering;
+
+  /// Encrypted send progress step: computing and checking nullifiers
+  ///
+  /// In en, this message translates to:
+  /// **'Securing transaction'**
+  String get encryptedSendStepSecuring;
+
+  /// Encrypted send progress step: generating individual ZK proofs
+  ///
+  /// In en, this message translates to:
+  /// **'Generate proofs'**
+  String get encryptedSendStepGenerating;
+
+  /// Encrypted send progress step: aggregating ZK proofs
+  ///
+  /// In en, this message translates to:
+  /// **'Building privacy proof'**
+  String get encryptedSendStepProving;
+
+  /// Encrypted send progress step: submitting the transaction
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting to chain'**
+  String get encryptedSendStepSubmitting;
+
+  /// Footer text on encrypted send progress screen
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy takes a moment. Please keep the app open until the transaction completes.'**
+  String get encryptedSendProgressFooter;
+
+  /// Notice on the cancelled encrypted-send screen when some batches were already submitted
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} was already sent before cancelling. The rest remains in your account.'**
+  String encryptedSendCancelledPartial(String amount);
+
+  /// Stacked banner kicker when an encrypted send was cancelled before anything left the wallet
+  ///
+  /// In en, this message translates to:
+  /// **'Your funds are safe'**
+  String get encryptedSendFundsSafeLabel;
+
+  /// Stacked banner caption when an encrypted send was cancelled before anything left the wallet
+  ///
+  /// In en, this message translates to:
+  /// **'Still in {account}. Nothing left your wallet.'**
+  String encryptedSendFundsSafeCaption(String account);
+
+  /// Title of the private-send notice on encrypted send recipient screen
+  ///
+  /// In en, this message translates to:
+  /// **'Private Send'**
+  String get privateSendTitle;
+
+  /// Subtitle of the private-send notice on encrypted send recipient screen. Must not overstate the guarantee: the recipient and amount are still visible on chain, only the source linkage is hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hides the link between your account and the recipient'**
+  String get privateSendSubtitle;
+
+  /// Error shown when the planned inputs of an encrypted send were spent between review and confirm
+  ///
+  /// In en, this message translates to:
+  /// **'Your encrypted balance changed while reviewing. Please go back and enter the amount again.'**
+  String get encryptedSendPlanStale;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

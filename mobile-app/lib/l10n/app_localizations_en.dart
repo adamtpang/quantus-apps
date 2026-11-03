@@ -18,61 +18,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletInitErrorButtonLabel => 'OK';
 
   @override
-  String get migrationDialogTitle => 'Migrate your accounts';
-
-  @override
-  String get migrationDialogBody =>
-      'We\'ll record your old‑chain testnet rewards and actions to determine rewards on the new Quantus Testnet.\n\nBalances do not migrate.\n\nUse the new testnet faucet for funds.';
-
-  @override
-  String migrationDialogAccountsToMigrate(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count Accounts to migrate.',
-      one: '1 Account to migrate.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String migrationDialogAccountsCannotMigrate(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count accounts cannot be migrated (missing wallet data).',
-      one: '1 account cannot be migrated (missing wallet data).',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get migrationDialogUploadError => 'We couldn\'t upload migration data. Please retry or try later.';
-
-  @override
-  String get migrationDialogMigrate => 'Migrate Accounts';
-
-  @override
-  String get migrationDialogRetry => 'Retry';
-
-  @override
-  String get migrationDialogTryLater => 'Try later';
-
-  @override
-  String get migrationDialogSkip => 'Skip';
-
-  @override
-  String migrationPartialFailureToast(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count accounts could not be migrated. Migration will retry on next app launch.',
-      one: '1 account could not be migrated. Migration will retry on next app launch.',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String get authUseDeviceBiometricsToUnlock => 'Use device biometrics to unlock';
 
   @override
@@ -140,6 +85,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountReadyDone => 'Done';
 
   @override
+  String get accountReadyTwoAccountsCreated => 'Two accounts were created for you.';
+
+  @override
+  String get accountReadyMainAccountDescription => 'Your main account. Fast, visible on chain.';
+
+  @override
+  String get accountReadyEncryptedAccountDescription => 'For private transactions. Shielded, slower.';
+
+  @override
+  String get accountReadyGoToWallet => 'Go to Wallet';
+
+  @override
   String get importWalletAppBarTitle => 'Import Wallet';
 
   @override
@@ -163,9 +120,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeNoActiveAccount => 'No active account';
 
   @override
-  String get homeCharge => 'Charge';
-
-  @override
   String get homeGetTestnetTokens => 'Get Testnet Tokens ↗';
 
   @override
@@ -173,6 +127,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeBackupReminder => 'Back up your recovery phrase';
+
+  @override
+  String get networkStatusOfflineBanner => 'Offline · showing last known balances';
 
   @override
   String get homeReceive => 'Receive';
@@ -199,7 +156,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeActivityEmptyTitle => 'No Transactions Yet';
 
   @override
-  String get homeActivityEmptyMessage => 'Your activity will appear here once you send or receive QUAN.';
+  String homeActivityEmptyMessage(String tokenSymbol) {
+    return 'Your activity will appear here once you send or receive $tokenSymbol.';
+  }
 
   @override
   String get accountsSheetTitle => 'Accounts';
@@ -241,16 +200,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get accountsSheetSubheaderTransparent => 'Transparent Accounts';
+  String get accountsScreenActiveWallet => 'Active Wallet';
 
   @override
-  String get accountsSheetSubheaderEncrypted => 'Encrypted Account';
+  String accountsScreenAccountCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count Accounts', one: '1 Account');
+    return '$_temp0';
+  }
 
   @override
-  String get accountsSheetSubheaderKeystone => 'Keystone Accounts';
+  String get walletNameTitle => 'Wallet Name';
 
   @override
-  String get accountsSheetSubheaderMultisig => 'Multisig Accounts';
+  String get walletNameSubtitle =>
+      'Naming your wallets makes it easier to tell their accounts apart. Each wallet has its own encrypted account.';
+
+  @override
+  String get walletNameHint => 'Enter a name for your wallet';
 
   @override
   String get addAccountMenuTitle => 'Add Account';
@@ -265,7 +231,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addAccountMenuMoreTitle => 'Advanced';
 
   @override
-  String get addAccountMenuImportKeystoneTitle => 'Add Keystone Account';
+  String get addAccountMenuImportKeystoneTitle => 'Add Keystone Wallet';
 
   @override
   String get addAccountMenuImportKeystoneSubtitle => 'Air-gapped signing via QR code';
@@ -414,6 +380,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String multisigProposalToAddress(String address) {
     return 'to $address';
   }
+
+  @override
+  String get multisigProposalCallLoading => 'Reading the proposal from the chain…';
+
+  @override
+  String get multisigProposalCallUnavailable =>
+      'Could not read this proposal from the chain, so there is nothing to approve. Try again when you are back online.';
+
+  @override
+  String get multisigProposalInvalid => 'Invalid proposal';
 
   @override
   String get multisigStatusApproved => 'SIGNED';
@@ -817,6 +793,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountMenuAddressDetails => 'Address Details';
 
   @override
+  String get accountMenuInnerHash => 'Inner Hash';
+
+  @override
   String get accountMenuShowRecoveryPhrase => 'Show Recovery Phrase';
 
   @override
@@ -883,34 +862,62 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountDetailsTitle => 'Address Details';
 
   @override
-  String get addHardwareAccountAddWallet => 'Add Hardware Wallet';
+  String get innerHashTitle => 'Inner Hash';
 
   @override
-  String get addHardwareAccountAddAccount => 'Add Hardware Account';
+  String get innerHashLabel => 'INNER HASH';
 
   @override
-  String get addHardwareAccountNameLabel => 'NAME';
+  String get innerHashCopied => 'Inner hash copied';
 
   @override
-  String get addHardwareAccountNameHintWallet => 'Hardware Wallet';
+  String get innerHashLoadError => 'Couldn\'t load inner hash';
 
   @override
-  String get addHardwareAccountNameHintAccount => 'Account';
+  String get addKeystoneAppBarTitle => 'Add Keystone Wallet';
 
   @override
-  String get addHardwareAccountAddressLabel => 'ADDRESS';
+  String get addKeystoneIntroTitle => 'Keystone Hardware Wallet';
 
   @override
-  String get addHardwareAccountAddressHint => 'Signer address';
+  String get addKeystoneIntroSubtitle =>
+      'Air-gapped signing for QUAN. Keys stay on the device, signing happens over QR.';
 
   @override
-  String get addHardwareAccountDebugFill => 'Debug Fill';
+  String get addKeystoneConnectButton => 'Connect Hardware Wallet';
 
   @override
-  String get addHardwareAccountNameRequired => 'Name is required';
+  String get addKeystoneGetOneLink => 'Don\'t have one? Get a Keystone ↗';
 
   @override
-  String get addHardwareAccountInvalidAddress => 'Invalid address';
+  String get addKeystoneConnectTitle => 'Connect Hardware Wallet';
+
+  @override
+  String get addKeystoneConnectSubtitle => 'Scan your device\'s QR code to connect.';
+
+  @override
+  String get addKeystoneBeforeYouStart => 'BEFORE YOU START';
+
+  @override
+  String get addKeystoneFirmwareTitle => 'Update to the latest Keystone firmware';
+
+  @override
+  String get addKeystoneFirmwareSubtitle => 'Required for QUAN signing';
+
+  @override
+  String get addKeystoneOnYourKeystone => 'ON YOUR KEYSTONE';
+
+  @override
+  String get addKeystoneStepUnlock => 'Unlock your Keystone';
+
+  @override
+  String get addKeystoneStepSelectQuantus => 'Select Quantus and scan the QR code';
+
+  @override
+  String get addKeystoneReadyToScan => 'Ready to Scan';
+
+  @override
+  String get invalidAddress => 'Invalid address';
 
   @override
   String get sendTitle => 'Send';
@@ -989,6 +996,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sendReviewSubmitFailed => 'Failed submitting transaction';
 
   @override
+  String get sendRegularAccountRequired => 'Switch to a regular account to send';
+
+  @override
   String sendTxSubmittedHeadlinePaid(String amount, String symbol) {
     return '$amount $symbol paid';
   }
@@ -1008,23 +1018,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sendTxSubmittedDone => 'Done';
 
   @override
+  String get keystoneSignScreenTitle => 'Sign with Keystone';
+
+  @override
+  String keystoneSignStep(int current, int total) {
+    return 'STEP $current/$total';
+  }
+
+  @override
   String get keystoneSignTitle => 'Scan with your Keystone';
 
   @override
-  String get keystoneSignInstruction => 'Show this QR code to your Keystone hardware wallet to sign the transaction.';
+  String get keystoneSignInstruction => 'Open your Keystone and scan this QR code to load the transaction.';
 
   @override
-  String get keystoneSignNext => 'Scan signature';
+  String get keystoneSignYouAreSigning => 'YOU ARE SIGNING';
+
+  @override
+  String get keystoneSignNext => 'Continue to Sign';
+
+  @override
+  String get keystoneSignCancel => 'Cancel Transaction';
 
   @override
   String get keystoneSignError => 'Failed to prepare the transaction. Please try again.';
 
   @override
-  String get keystoneScanInstruction => 'Scan the signature QR from your Keystone';
+  String get keystoneVerifyTitle => 'Check your Keystone Screen';
+
+  @override
+  String get keystoneVerifyInstruction => 'Before approving on your Keystone, make sure its screen shows exactly this:';
+
+  @override
+  String get keystoneVerifyWarning =>
+      'If the amount or address on your Keystone screen is different from what\'s shown here, reject the transaction on your device.';
+
+  @override
+  String get keystoneVerifyMismatch => 'It doesn\'t match';
+
+  @override
+  String get keystoneScanTitle => 'Scan the signature';
+
+  @override
+  String get keystoneScanInstruction =>
+      'Your Keystone is now showing an animated QR. Hold your phone up to it, this takes a moment.';
+
+  @override
+  String get keystoneScanReceiving => 'RECEIVING SIGNATURE';
 
   @override
   String keystoneScanProgress(int scanned, int total) {
-    return '$scanned / $total frames';
+    return '$scanned/$total';
   }
 
   @override
@@ -1039,6 +1083,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keystoneScanError => 'Couldn\'t read the signature. Please try again.';
 
   @override
+  String get keystoneScanExpired =>
+      'The transaction expired before it could be submitted. Go back and scan the new QR code with your device.';
+
+  @override
+  String get keystoneRejectTitle => 'Don\'t approve this transaction';
+
+  @override
+  String get keystoneRejectStep1Title => 'Reject the transaction on your Keystone.';
+
+  @override
+  String get keystoneRejectStep1Body => 'Nothing is signed or sent until you approve there.';
+
+  @override
+  String get keystoneRejectStep2Title => 'Don\'t retry from this phone.';
+
+  @override
+  String get keystoneRejectStep2Body => 'If it\'s compromised, retrying gives the attacker another chance.';
+
+  @override
+  String get keystoneRejectStep3Title => 'Your funds are safe on the Keystone.';
+
+  @override
+  String get keystoneRejectStep3Body => 'Keys never left the device. Move to a trusted phone before sending again.';
+
+  @override
+  String get keystoneRejectConfirm => 'I rejected it on Keystone';
+
+  @override
+  String get keystoneRejectContactSupport => 'Contact Support';
+
+  @override
   String get sendLogicCantSelfTransfer => 'Can\'t Self Transfer';
 
   @override
@@ -1048,7 +1123,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sendLogicInvalidAmount => 'Invalid Amount';
 
   @override
-  String get sendLogicBelowExistentialDeposit => 'Below Existential Deposit';
+  String sendLogicBelowMinimum(String amount, String tokenSymbol) {
+    return 'Minimum is $amount $tokenSymbol';
+  }
 
   @override
   String get sendLogicInsufficientBalance => 'Insufficient Balance';
@@ -1069,6 +1146,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get activityEmpty => 'No transactions yet';
+
+  @override
+  String get activityPrivateTotalReceived => 'Total Received';
+
+  @override
+  String get activityPrivateTotalSent => 'Total Sent';
 
   @override
   String get activityFilterAll => 'All';
@@ -1099,6 +1182,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get activityTxReceived => 'Received';
+
+  @override
+  String get activityTxPrivatelySending => 'Privately Sending';
+
+  @override
+  String get activityTxPrivatelyReceiving => 'Privately Receiving';
+
+  @override
+  String get activityTxPrivateSent => 'Private Sent';
+
+  @override
+  String get activityTxPrivateReceived => 'Private Received';
 
   @override
   String get activityTxMultisigCreated => 'Multisig created';
@@ -1152,6 +1247,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get activityDetailTitleReceived => 'Received';
+
+  @override
+  String get activityDetailTitlePrivatelySending => 'Privately Sending';
+
+  @override
+  String get activityDetailTitlePrivatelyReceiving => 'Privately Receiving';
+
+  @override
+  String get activityDetailTitlePrivateSent => 'Private Sent';
+
+  @override
+  String get activityDetailTitlePrivateReceived => 'Private Received';
 
   @override
   String get activityDetailTitleMultisigCreated => 'Multisig created';
@@ -1243,12 +1350,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receiveTitle => 'Receive';
 
   @override
-  String get receiveTabQrCode => 'QR Code';
-
-  @override
-  String get receiveTabAddress => 'Address';
-
-  @override
   String get receiveCopy => 'Copy';
 
   @override
@@ -1260,66 +1361,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receiveCopiedMessage => 'Address copied to clipboard';
 
   @override
-  String get posAmountTitle => 'New Charge';
+  String get receiveYourAddressLabel => 'YOUR ADDRESS';
 
   @override
-  String posAmountCharge(String amount) {
-    return 'Charge $amount';
-  }
+  String get receiveCopyAddress => 'Copy Address';
 
   @override
-  String get posAmountEnterAmount => 'Enter Amount';
-
-  @override
-  String get posQrTitleScanToPay => 'Scan to Pay';
-
-  @override
-  String get posQrTitlePaymentReceived => 'Payment Received';
-
-  @override
-  String posQrError(String error) {
-    return 'Error: $error';
-  }
-
-  @override
-  String get posQrNoActiveAccount => 'No active account';
-
-  @override
-  String get posQrInvalidAmount => 'Invalid amount. Tap to retry.';
-
-  @override
-  String get posQrConnectionLost => 'Connection lost. Tap to retry.';
-
-  @override
-  String get posQrTimedOut => 'Timed out. Tap to retry.';
-
-  @override
-  String get posQrNewCharge => 'New Charge';
-
-  @override
-  String get posQrDone => 'Done';
-
-  @override
-  String posQrAmountReceived(String amount) {
-    return '$amount received';
-  }
-
-  @override
-  String get posQrFrom => 'From:';
-
-  @override
-  String get posQrWaitingForPayment => 'Waiting for payment';
-
-  @override
-  String get posQrNetworkError => 'Network Error';
-
-  @override
-  String get posQrTryAgain => 'Try Again';
-
-  @override
-  String posQrPaidAt(String time) {
-    return 'At $time';
-  }
+  String get receiveCheckphraseFootnote => 'Ask the sender to confirm this phrase matches your address.';
 
   @override
   String get settingsTitle => 'Settings';
@@ -1334,7 +1382,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPreferencesTitle => 'Preferences';
 
   @override
-  String get settingsPreferencesSubtitle => 'Language, currency, POS mode, notifications';
+  String get settingsPreferencesSubtitle => 'Language, currency, notifications';
 
   @override
   String get settingsMiningRewards => 'Mining Rewards';
@@ -1454,12 +1502,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPreferencesLanguageSubtitle => 'App display language';
 
   @override
-  String get settingsPreferencesPosMode => 'POS Mode';
-
-  @override
-  String get settingsPreferencesPosModeSubtitle => 'Point of sale features';
-
-  @override
   String get settingsPreferencesNotifications => 'Notifications';
 
   @override
@@ -1524,7 +1566,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMiningStatRedeemable => 'REDEEMABLE';
 
   @override
-  String get settingsMiningQuanEarned => 'QUAN EARNED';
+  String settingsMiningTokenEarned(String tokenSymbol) {
+    return '$tokenSymbol EARNED';
+  }
 
   @override
   String get settingsMiningViewTelemetry => 'View Telemetry ↗';
@@ -1644,13 +1688,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get swapGetQuote => 'Get a Quote';
 
   @override
-  String swapRateLabel(String amount, String symbol) {
-    return '1 QUAN = $amount $symbol';
+  String swapRateLabel(String amount, String symbol, String tokenSymbol) {
+    return '1 $tokenSymbol = $amount $symbol';
   }
 
   @override
-  String swapRateZero(String symbol) {
-    return '1 QUAN = 0 $symbol';
+  String swapRateZero(String symbol, String tokenSymbol) {
+    return '1 $tokenSymbol = 0 $symbol';
   }
 
   @override
@@ -1708,12 +1752,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get swapDepositCompleteTitle => 'Swap Complete';
 
   @override
-  String swapDepositCompleteBody(String amount) {
-    return 'Your swap for $amount QUAN is complete.';
+  String swapDepositCompleteBody(String amount, String tokenSymbol) {
+    return 'Your swap for $amount $tokenSymbol is complete.';
   }
 
   @override
   String get swapDepositTestnetBanner => 'DEMO ONLY - WE ARE STILL ON TESTNET';
+
+  @override
+  String get swapDemoOnly => 'Demo Only';
+
+  @override
+  String get swapDemoOnlyBody => 'No real swap was performed.';
 
   @override
   String get swapDepositSentFunds => 'I\'ve sent the funds';
@@ -1749,10 +1799,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get componentNameFieldHint => 'Enter a name for your account';
 
   @override
+  String get componentAmountApproximatePrefix => '≈';
+
+  @override
   String get commonLoading => 'Loading...';
 
   @override
   String get commonCancel => 'Cancel';
+
+  @override
+  String get commonCanceling => 'Canceling...';
 
   @override
   String commonAmountBalance(String balance, String symbol) {
@@ -1764,6 +1820,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonDone => 'Done';
+
+  @override
+  String get commonTryAgain => 'Try Again';
 
   @override
   String get redeemToLabel => 'Redeem To';
@@ -1791,7 +1850,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get redeemConfirmFee => 'Fee';
 
   @override
-  String get redeemFeeValue => '0.1% volume fee';
+  String redeemFeeValue(String rate) {
+    return '$rate% volume fee';
+  }
 
   @override
   String get redeemProgressTitle => 'Redeeming...';
@@ -1821,7 +1882,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get redeemStepProofs => 'Generating ZK proofs';
 
   @override
-  String get redeemStepAggregate => 'Aggregating & submitting';
+  String get redeemStepAggregate => 'Aggregating proofs';
+
+  @override
+  String get redeemStepSubmit => 'Submitting to chain';
 
   @override
   String redeemFetchedCount(int count) {
@@ -1844,4 +1908,74 @@ class AppLocalizationsEn extends AppLocalizations {
   String redeemSuccessBanner(String amount, int count) {
     return '$amount redeemed in $count batch(es)';
   }
+
+  @override
+  String get encryptedSendFeeLabel => 'Privacy fee';
+
+  @override
+  String encryptedSendAmountStep(String tokenSymbol) {
+    return 'Use steps of 0.01 $tokenSymbol';
+  }
+
+  @override
+  String encryptedSendMinimum(String tokenSymbol) {
+    return 'Encrypted sends must move at least 0.1 $tokenSymbol';
+  }
+
+  @override
+  String get encryptedSendProgressTitle => 'Private Send';
+
+  @override
+  String get encryptedSendFailedTitle => 'Send Failed';
+
+  @override
+  String get encryptedSendCancelledTitle => 'Send Cancelled';
+
+  @override
+  String get encryptedSendingLabel => 'SENDING PRIVATELY';
+
+  @override
+  String get encryptedSendStepPreparing => 'Preparing';
+
+  @override
+  String get encryptedSendStepGathering => 'Gathering funds';
+
+  @override
+  String get encryptedSendStepSecuring => 'Securing transaction';
+
+  @override
+  String get encryptedSendStepGenerating => 'Generate proofs';
+
+  @override
+  String get encryptedSendStepProving => 'Building privacy proof';
+
+  @override
+  String get encryptedSendStepSubmitting => 'Submitting to chain';
+
+  @override
+  String get encryptedSendProgressFooter =>
+      'Privacy takes a moment. Please keep the app open until the transaction completes.';
+
+  @override
+  String encryptedSendCancelledPartial(String amount) {
+    return '$amount was already sent before cancelling. The rest remains in your account.';
+  }
+
+  @override
+  String get encryptedSendFundsSafeLabel => 'Your funds are safe';
+
+  @override
+  String encryptedSendFundsSafeCaption(String account) {
+    return 'Still in $account. Nothing left your wallet.';
+  }
+
+  @override
+  String get privateSendTitle => 'Private Send';
+
+  @override
+  String get privateSendSubtitle => 'Hides the link between your account and the recipient';
+
+  @override
+  String get encryptedSendPlanStale =>
+      'Your encrypted balance changed while reviewing. Please go back and enter the amount again.';
 }

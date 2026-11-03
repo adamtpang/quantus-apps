@@ -65,6 +65,18 @@ class $Event {
   ProofVerified proofVerified({required BigInt exitAmount, required List<List<int>> nullifiers}) {
     return ProofVerified(exitAmount: exitAmount, nullifiers: nullifiers);
   }
+
+  MinerVolumeFeePaid minerVolumeFeePaid({required _i3.AccountId32 miner, required BigInt amount}) {
+    return MinerVolumeFeePaid(miner: miner, amount: amount);
+  }
+
+  SegmentsDenied segmentsDenied({required List<int> indices}) {
+    return SegmentsDenied(indices: indices);
+  }
+
+  ExitMintFailed exitMintFailed({required _i3.AccountId32 account, required BigInt amount}) {
+    return ExitMintFailed(account: account, amount: amount);
+  }
 }
 
 class $EventCodec with _i1.Codec<Event> {
@@ -80,6 +92,12 @@ class $EventCodec with _i1.Codec<Event> {
         return AssetTransferred._decode(input);
       case 2:
         return ProofVerified._decode(input);
+      case 3:
+        return MinerVolumeFeePaid._decode(input);
+      case 4:
+        return SegmentsDenied._decode(input);
+      case 5:
+        return ExitMintFailed._decode(input);
       default:
         throw Exception('Event: Invalid variant index: "$index"');
     }
@@ -97,6 +115,15 @@ class $EventCodec with _i1.Codec<Event> {
       case ProofVerified:
         (value as ProofVerified).encodeTo(output);
         break;
+      case MinerVolumeFeePaid:
+        (value as MinerVolumeFeePaid).encodeTo(output);
+        break;
+      case SegmentsDenied:
+        (value as SegmentsDenied).encodeTo(output);
+        break;
+      case ExitMintFailed:
+        (value as ExitMintFailed).encodeTo(output);
+        break;
       default:
         throw Exception('Event: Unsupported "$value" of type "${value.runtimeType}"');
     }
@@ -111,6 +138,12 @@ class $EventCodec with _i1.Codec<Event> {
         return (value as AssetTransferred)._sizeHint();
       case ProofVerified:
         return (value as ProofVerified)._sizeHint();
+      case MinerVolumeFeePaid:
+        return (value as MinerVolumeFeePaid)._sizeHint();
+      case SegmentsDenied:
+        return (value as SegmentsDenied)._sizeHint();
+      case ExitMintFailed:
+        return (value as ExitMintFailed)._sizeHint();
       default:
         throw Exception('Event: Unsupported "$value" of type "${value.runtimeType}"');
     }
@@ -333,4 +366,134 @@ class ProofVerified extends Event {
 
   @override
   int get hashCode => Object.hash(exitAmount, nullifiers);
+}
+
+/// The block author's share of the wormhole exit volume fee was minted.
+///
+/// NOTE: keep this as the last variant — indexers decode events by their
+/// position in this enum, so existing variants must never be reordered.
+class MinerVolumeFeePaid extends Event {
+  const MinerVolumeFeePaid({required this.miner, required this.amount});
+
+  factory MinerVolumeFeePaid._decode(_i1.Input input) {
+    return MinerVolumeFeePaid(
+      miner: const _i1.U8ArrayCodec(32).decode(input),
+      amount: _i1.U128Codec.codec.decode(input),
+    );
+  }
+
+  /// <T as frame_system::Config>::AccountId
+  final _i3.AccountId32 miner;
+
+  /// BalanceOf<T>
+  final BigInt amount;
+
+  @override
+  Map<String, Map<String, dynamic>> toJson() => {
+    'MinerVolumeFeePaid': {'miner': miner.toList(), 'amount': amount},
+  };
+
+  int _sizeHint() {
+    int size = 1;
+    size = size + const _i3.AccountId32Codec().sizeHint(miner);
+    size = size + _i1.U128Codec.codec.sizeHint(amount);
+    return size;
+  }
+
+  void encodeTo(_i1.Output output) {
+    _i1.U8Codec.codec.encodeTo(3, output);
+    const _i1.U8ArrayCodec(32).encodeTo(miner, output);
+    _i1.U128Codec.codec.encodeTo(amount, output);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MinerVolumeFeePaid && _i4.listsEqual(other.miner, miner) && other.amount == amount;
+
+  @override
+  int get hashCode => Object.hash(miner, amount);
+}
+
+/// Some segments of an exit bundle were denied (their nullifiers were already
+/// used, e.g. because the underlying private batch landed on-chain separately).
+/// The remaining segments were processed normally.
+class SegmentsDenied extends Event {
+  const SegmentsDenied({required this.indices});
+
+  factory SegmentsDenied._decode(_i1.Input input) {
+    return SegmentsDenied(indices: _i1.U32SequenceCodec.codec.decode(input));
+  }
+
+  /// Vec<u32>
+  final List<int> indices;
+
+  @override
+  Map<String, Map<String, List<int>>> toJson() => {
+    'SegmentsDenied': {'indices': indices},
+  };
+
+  int _sizeHint() {
+    int size = 1;
+    size = size + _i1.U32SequenceCodec.codec.sizeHint(indices);
+    return size;
+  }
+
+  void encodeTo(_i1.Output output) {
+    _i1.U8Codec.codec.encodeTo(4, output);
+    _i1.U32SequenceCodec.codec.encodeTo(indices, output);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is SegmentsDenied && _i4.listsEqual(other.indices, indices);
+
+  @override
+  int get hashCode => indices.hashCode;
+}
+
+/// An exit slot could not be minted (e.g. a below-existential-deposit credit to
+/// a fresh account) and was skipped so the rest of the bundle still processed.
+/// The skipped exit's nullifier stays marked, so this exit cannot be retried.
+///
+/// NOTE: keep new variants appended at the end — indexers decode events by their
+/// position in this enum, so existing variants must never be reordered.
+class ExitMintFailed extends Event {
+  const ExitMintFailed({required this.account, required this.amount});
+
+  factory ExitMintFailed._decode(_i1.Input input) {
+    return ExitMintFailed(account: const _i1.U8ArrayCodec(32).decode(input), amount: _i1.U128Codec.codec.decode(input));
+  }
+
+  /// <T as frame_system::Config>::AccountId
+  final _i3.AccountId32 account;
+
+  /// BalanceOf<T>
+  final BigInt amount;
+
+  @override
+  Map<String, Map<String, dynamic>> toJson() => {
+    'ExitMintFailed': {'account': account.toList(), 'amount': amount},
+  };
+
+  int _sizeHint() {
+    int size = 1;
+    size = size + const _i3.AccountId32Codec().sizeHint(account);
+    size = size + _i1.U128Codec.codec.sizeHint(amount);
+    return size;
+  }
+
+  void encodeTo(_i1.Output output) {
+    _i1.U8Codec.codec.encodeTo(5, output);
+    const _i1.U8ArrayCodec(32).encodeTo(account, output);
+    _i1.U128Codec.codec.encodeTo(amount, output);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExitMintFailed && _i4.listsEqual(other.account, account) && other.amount == amount;
+
+  @override
+  int get hashCode => Object.hash(account, amount);
 }

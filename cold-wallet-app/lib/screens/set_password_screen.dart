@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quantus_cold_wallet/components/quantus_button.dart';
-import 'package:quantus_cold_wallet/components/scaffold_base.dart';
-import 'package:quantus_cold_wallet/components/scaffold_base_bottom_content.dart';
-import 'package:quantus_cold_wallet/components/v2_app_bar.dart';
+import 'package:quantus_sdk/quantus_sdk.dart';
+import 'package:quantus_cold_wallet/components/password_field.dart';
+import 'package:quantus_cold_wallet/models/cold_account.dart';
 import 'package:quantus_cold_wallet/providers/wallet_providers.dart';
-import 'package:quantus_cold_wallet/theme/app_colors.dart';
-import 'package:quantus_cold_wallet/theme/app_text_styles.dart';
-import 'package:quantus_cold_wallet/widgets/password_field.dart';
 
 class SetPasswordScreen extends ConsumerStatefulWidget {
   final String mnemonic;
-  const SetPasswordScreen({super.key, required this.mnemonic});
+  final List<ColdAccount> accounts;
+
+  const SetPasswordScreen({super.key, required this.mnemonic, required this.accounts});
 
   @override
   ConsumerState<SetPasswordScreen> createState() => _SetPasswordScreenState();
 }
 
 class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
-  static const _minLength = 8;
-
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   bool _biometricAvailable = false;
@@ -50,7 +46,6 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
   }
 
   String? _validate() {
-    if (_password.text.length < _minLength) return 'Password must be at least $_minLength characters';
     if (_password.text != _confirm.text) return 'Passwords do not match';
     return null;
   }
@@ -68,7 +63,12 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
     try {
       await ref
           .read(walletControllerProvider.notifier)
-          .createWallet(mnemonic: widget.mnemonic, password: _password.text, enableBiometric: _enableBiometric);
+          .createWallet(
+            mnemonic: widget.mnemonic,
+            password: _password.text,
+            enableBiometric: _enableBiometric,
+            accounts: widget.accounts,
+          );
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
@@ -82,8 +82,8 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final text = context.themeText;
+    final colors = context.colorsV3;
+    final text = context.themeTextV3;
 
     return ScaffoldBase(
       appBar: const V2AppBar(title: 'Set password'),
@@ -93,7 +93,7 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
           children: [
             Text(
               'Your password encrypts the wallet key stored on this device. There is no recovery if you forget it.',
-              style: text.smallParagraph?.copyWith(color: colors.textTertiary),
+              style: text.body.copyWith(color: colors.textMuted),
             ),
             const SizedBox(height: 24),
             PasswordField(controller: _password, hintText: 'Password'),
@@ -102,7 +102,7 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
             if (_biometricAvailable) ...[const SizedBox(height: 24), _biometricToggle(colors, text)],
             if (_error != null) ...[
               const SizedBox(height: 16),
-              Text(_error!, style: text.detail?.copyWith(color: colors.error)),
+              Text(_error!, style: text.caption.copyWith(color: colors.semanticEmber)),
             ],
           ],
         ),
@@ -113,24 +113,24 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
     );
   }
 
-  Widget _biometricToggle(AppColorsV2 colors, AppTextTheme text) {
+  Widget _biometricToggle(AppColorsV3 colors, AppTextThemeV3 text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: colors.surfaceDeep,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.borderButton, width: 1),
+        color: colors.bgSurface,
+        borderRadius: context.radiusV3.mdBorder,
+        border: Border.all(color: colors.borderHairline, width: 1),
       ),
       child: Row(
         children: [
-          Icon(Icons.fingerprint, color: colors.textPrimary, size: 20),
+          Icon(Icons.fingerprint, color: colors.textContent, size: 20),
           const SizedBox(width: 12),
           Expanded(
-            child: Text('Enable biometric unlock', style: text.smallParagraph?.copyWith(color: colors.textPrimary)),
+            child: Text('Enable biometric unlock', style: text.body.copyWith(color: colors.textContent)),
           ),
           Switch(
             value: _enableBiometric,
-            activeThumbColor: colors.accentOrange,
+            activeTrackColor: colors.accentFlare,
             onChanged: (v) => setState(() => _enableBiometric = v),
           ),
         ],
