@@ -21,6 +21,11 @@ Uint8List getAccountId32(String ss58Address) {
   return Address.decode(ss58Address).addressBytes;
 }
 
+/// Block coordinates for a mortal extrinsic: [blockHash] is the hash of block
+/// [blockNumber] (hex, no 0x prefix), which the era in the signed payload uses
+/// as its birth block.
+typedef MortalityCheckpoint = ({int blockNumber, String blockHash});
+
 class SubstrateService {
   static final SubstrateService _instance = SubstrateService._internal();
   factory SubstrateService() => _instance;
@@ -243,23 +248,24 @@ class SubstrateService {
     return isRetry && (message.contains('outdated') || message.contains('stale'));
   }
 
-  /// Everything chain-dependent a signing payload needs, fetched in one
-  /// parallel round trip. Genesis hash and runtime version come from cache
-  /// when fresh, so usually only header, block hash and nonce hit the network.
+  /// Everything chain-dependent a signing payload needs. Genesis hash and
+  /// runtime version come from cache when fresh. The mortal-era birth block
+  /// and the hash of that exact block are read sequentially on one endpoint
+  /// so the pair cannot disagree; the nonce is fetched in parallel with them.
   Future<({RuntimeVersion runtimeVersion, dynamic genesisHash, int blockNumber, dynamic blockHash, int nonce})>
   _getSigningContext(String accountId) async {
-    final [runtimeVersion, genesisHash, blockNumber, blockHash, nonce] = await Future.wait<dynamic>([
+    final [runtimeVersion, genesisHash, checkpointResult, nonce] = await Future.wait<dynamic>([
       getRuntimeVersion(),
       _getGenesisHash(),
-      _getBlockNumber(),
-      _getBlockHash(),
+      _getMortalityCheckpoint(),
       _getNextAccountNonceFromAddress(accountId),
     ]);
+    final checkpoint = checkpointResult as MortalityCheckpoint;
     return (
       runtimeVersion: runtimeVersion as RuntimeVersion,
       genesisHash: genesisHash,
-      blockNumber: blockNumber as int,
-      blockHash: blockHash,
+      blockNumber: checkpoint.blockNumber,
+      blockHash: checkpoint.blockHash,
       nonce: nonce as int,
     );
   }
@@ -396,9 +402,42 @@ class SubstrateService {
     return int.parse(nonceResult.result.toString());
   }
 
-  Future<dynamic> _getBlockHash() async {
-    final result = await _rpcEndpointService.providerTask((provider) => provider.send('chain_getBlockHash', []));
-    return result.result.replaceAll('0x', '');
+  /// The era signed into a mortal extrinsic uses the payload's block number as
+  /// its birth block, and the node verifies the signature against the hash of
+  /// that exact block. Fetching the best-block hash in a separate call can
+  /// return a different block's hash — a block can land between the two calls,
+  /// or endpoint failover can serve them from nodes at different heights — and
+  /// the node then rejects the extrinsic as invalid. Fetch the header and the
+  /// hash *at that number* sequentially on a single endpoint so the pair can
+  /// never disagree.
+  Future<MortalityCheckpoint> _getMortalityCheckpoint() {
+    return _rpcEndpointService.providerTask((provider) {
+      return fetchMortalityCheckpoint((method, params) async {
+        final response = await provider.send(method, params);
+        if (response.error != null) {
+          throw Exception('RPC Error: ${response.error}');
+        }
+        return response.result;
+      });
+    });
+  }
+
+  @visibleForTesting
+  static Future<MortalityCheckpoint> fetchMortalityCheckpoint(
+    Future<dynamic> Function(String method, List<dynamic> params) rpc,
+  ) async {
+    final header = await rpc('chain_getHeader', []);
+    final rawNumber = header['number'] as String;
+    // Substrate header numbers are 0x-prefixed hex. Decimal is accepted so a
+    // node that returns a plain integer string still pairs with the right hash.
+    final blockNumber = rawNumber.startsWith('0x')
+        ? int.parse(rawNumber.substring(2), radix: 16)
+        : int.parse(rawNumber);
+    final blockHash = await rpc('chain_getBlockHash', [blockNumber]);
+    if (blockHash == null) {
+      throw Exception('chain_getBlockHash($blockNumber) returned null');
+    }
+    return (blockNumber: blockNumber, blockHash: (blockHash as String).replaceAll('0x', ''));
   }
 
   /// Immutable per chain, so fetched once per app run.

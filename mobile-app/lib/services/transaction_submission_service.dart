@@ -535,6 +535,14 @@ class TransactionSubmissionService {
       quantusPrint('Failed to submit transaction ${pendingTx.id}: $e');
       quantusPrint('Stack trace: $stackTrace');
 
+      // The send UI only shows a generic failure message; record the real
+      // error so submission failures are diagnosable from telemetry.
+      final detail = e.toString();
+      TelemetryService().sendEvent(
+        'send_submit_failed',
+        parameters: {'error': detail.length > 200 ? detail.substring(0, 200) : detail},
+      );
+
       _ref.read(pendingTransactionsProvider.notifier).remove(pendingTx.id);
       rethrow;
     }
